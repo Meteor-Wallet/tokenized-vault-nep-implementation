@@ -1,10 +1,13 @@
 use near_contract_standards::fungible_token::{receiver::FungibleTokenReceiver, FungibleTokenCore};
 use near_sdk::{json_types::U128, AccountId, PromiseOrValue};
+
+pub mod events;
+
 #[allow(unused)]
 pub trait FungibleTokenVaultCore: FungibleTokenCore + FungibleTokenReceiver {
     fn asset(&self) -> AccountId;
     fn total_assets(&self) -> U128;
-    fn redeem(&mut self, shares: U128, receiver: Option<AccountId>) -> PromiseOrValue<U128>;
+    fn redeem(&mut self, shares: U128, receiver_id: Option<AccountId>) -> PromiseOrValue<U128>;
 
     fn convert_to_shares(&self, assets: U128) -> U128 {
         if (self.total_assets().0 == 0u128) {
@@ -36,7 +39,7 @@ pub trait FungibleTokenVaultCore: FungibleTokenCore + FungibleTokenReceiver {
             .into()
     }
 
-    fn max_deposit(&self, receiver: AccountId) -> U128 {
+    fn max_deposit(&self, receiver_id: AccountId) -> U128 {
         (u128::MAX - self.total_assets().0).into()
     }
 
@@ -45,8 +48,8 @@ pub trait FungibleTokenVaultCore: FungibleTokenCore + FungibleTokenReceiver {
         self.convert_to_shares(assets)
     }
 
-    fn max_redeem(&self, owner: AccountId) -> U128 {
-        self.ft_balance_of(owner)
+    fn max_redeem(&self, owner_id: AccountId) -> U128 {
+        self.ft_balance_of(owner_id)
     }
 
     fn preview_redeem(&self, shares: U128) -> U128 {
