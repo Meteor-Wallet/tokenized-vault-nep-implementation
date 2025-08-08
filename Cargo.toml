@@ -36,6 +36,7 @@ container_build_command = [
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
+near-contract-standards = "5.15.1"
 near-sdk = "5.14"
 
 [dev-dependencies]
