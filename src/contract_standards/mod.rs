@@ -12,7 +12,12 @@ construct_uint! {
 pub trait FungibleTokenVaultCore: FungibleTokenCore + FungibleTokenReceiver {
     fn asset(&self) -> AccountId;
     fn total_assets(&self) -> U128;
-    fn redeem(&mut self, shares: U128, receiver_id: Option<AccountId>) -> PromiseOrValue<U128>;
+    fn redeem(
+        &mut self,
+        shares: U128,
+        receiver_id: Option<AccountId>,
+        memo: Option<String>,
+    ) -> PromiseOrValue<U128>;
 
     fn convert_to_shares(&self, assets: U128) -> U128 {
         if (self.total_assets().0 == 0u128) {
