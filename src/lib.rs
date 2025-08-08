@@ -1,7 +1,7 @@
 pub mod asset_type;
+mod contract_standards;
 mod mul_div;
 mod multi_token;
-mod contract_standards;
 
 use near_contract_standards::fungible_token::{
     core::FungibleTokenCore,
@@ -145,7 +145,7 @@ impl ERC4626Vault {
             assert_eq!(&token_ids[0], token_id, "Invalid token ID");
 
             let amount = amounts[0];
-            
+
             // Check message to determine action
             if msg == "deposit" {
                 // Deposit: mint shares to sender
@@ -160,7 +160,8 @@ impl ERC4626Vault {
                     assets: amount,
                     shares: U128(shares),
                     memo: None,
-                }.emit();
+                }
+                .emit();
             } else {
                 // Just track assets without minting shares
                 self.total_assets += amount.0;
@@ -187,7 +188,7 @@ impl FungibleTokenVaultCore for ERC4626Vault {
     fn redeem(&mut self, shares: U128, receiver_id: Option<AccountId>) -> PromiseOrValue<U128> {
         let owner = env::predecessor_account_id();
         let receiver_id = receiver_id.unwrap_or(owner.clone());
-        
+
         let assets = self.convert_to_assets_internal(shares.0, Rounding::Down);
 
         // Burn shares
@@ -201,18 +202,16 @@ impl FungibleTokenVaultCore for ERC4626Vault {
             assets: U128(assets),
             shares,
             memo: None,
-        }.emit();
+        }
+        .emit();
 
         // Transfer underlying assets and return promise
-        PromiseOrValue::Promise(
-            self.internal_transfer_assets(receiver_id, assets)
-        )
+        PromiseOrValue::Promise(self.internal_transfer_assets(receiver_id, assets))
     }
 
     fn withdraw(&mut self, assets: U128, receiver_id: Option<AccountId>) -> PromiseOrValue<U128> {
         let owner = env::predecessor_account_id();
         let receiver_id = receiver_id.unwrap_or(owner.clone());
-
 
         let shares = self.convert_to_shares_internal(assets.0, Rounding::Up);
 
@@ -227,12 +226,11 @@ impl FungibleTokenVaultCore for ERC4626Vault {
             assets,
             shares: U128(shares),
             memo: None,
-        }.emit();
+        }
+        .emit();
 
         // Transfer underlying assets
-        PromiseOrValue::Promise(
-            self.internal_transfer_assets(receiver_id, assets.0)
-        )
+        PromiseOrValue::Promise(self.internal_transfer_assets(receiver_id, assets.0))
     }
 
     fn convert_to_shares(&self, assets: U128) -> U128 {
@@ -273,7 +271,12 @@ impl FungibleTokenReceiver for ERC4626Vault {
     /// Handle FT transfers to the vault
     /// - If msg is "deposit": mint vault shares to sender
     /// - Otherwise: just track assets without minting shares (for donations/yield additions)
-    fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
+    fn ft_on_transfer(
+        &mut self,
+        sender_id: AccountId,
+        amount: U128,
+        msg: String,
+    ) -> PromiseOrValue<U128> {
         // Only accept if this is an FT asset
         if let AssetType::FungibleToken { .. } = &self.asset {
             assert_eq!(
@@ -296,7 +299,8 @@ impl FungibleTokenReceiver for ERC4626Vault {
                     assets: amount,
                     shares: U128(shares),
                     memo: None,
-                }.emit();
+                }
+                .emit();
             } else {
                 // Just track assets without minting shares
                 self.total_assets += amount.0;
