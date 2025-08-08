@@ -11,6 +11,8 @@ pub trait FungibleTokenVaultCore: FungibleTokenCore + FungibleTokenReceiver {
             return assets;
         }
 
+        // TODO: upscale u128 to become u256 when multiplying/dividing, then downscale to u128
+        // to avoid overflow. Perform checks to ensure no overflow occurs.
         self.ft_total_supply()
             .0
             .checked_mul(assets.0)
@@ -23,6 +25,8 @@ pub trait FungibleTokenVaultCore: FungibleTokenCore + FungibleTokenReceiver {
     fn convert_to_assets(&self, shares: U128) -> U128 {
         assert!(self.ft_total_supply().0 > 0, "No shares issued yet");
 
+        // TODO: upscale u128 to become u256 when multiplying/dividing, then downscale to u128
+        // to avoid overflow. Perform checks to ensure no overflow occurs.
         shares
             .0
             .checked_mul(self.total_assets().0)
