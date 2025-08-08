@@ -1,6 +1,8 @@
 // Find all our documentation at https://docs.near.org
 use near_sdk::{log, near};
 
+mod contract_standards;
+
 // Define the contract structure
 #[near(contract_state)]
 pub struct Contract {
