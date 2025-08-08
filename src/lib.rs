@@ -72,7 +72,7 @@ impl ERC4626Vault {
 
     // ===== Withdraw =====
     
-    pub fn withdraw(&mut self, assets: U128, receiver: AccountId, owner: AccountId) -> Promise {
+    pub fn withdraw(&mut self, assets: U128, receiver_id: AccountId, owner: AccountId) -> Promise {
         assert_eq!(
             env::predecessor_account_id(),
             owner,
@@ -86,7 +86,7 @@ impl ERC4626Vault {
         self.total_assets -= assets.0;
 
         // Transfer underlying assets
-        self.internal_transfer_assets(receiver, assets.0)
+        self.internal_transfer_assets(receiver_id, assets.0)
     }
 
     // ===== Internal Helpers =====
@@ -140,20 +140,6 @@ impl ERC4626Vault {
         let assets_adj = self.total_assets + 1;
 
         mul_div(shares, assets_adj, supply_adj, rounding)
-    }
-
-    // ===== Direct Deposit Method =====
-    
-    /// Manual deposit method - requires user to transfer assets separately
-    pub fn deposit(&mut self, assets: U128, receiver: Option<AccountId>) -> U128 {
-        let receiver = receiver.unwrap_or_else(|| env::predecessor_account_id());
-        let shares = self.convert_to_shares_internal(assets.0, Rounding::Down);
-        
-        // Mint vault shares to receiver
-        self.token.internal_deposit(&receiver, shares);
-        self.total_assets += assets.0;
-        
-        U128(shares)
     }
 
     // ===== Internal helper for MT deposits =====
@@ -211,9 +197,9 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         U128(self.total_assets)
     }
 
-    fn redeem(&mut self, shares: U128, receiver: Option<AccountId>) -> PromiseOrValue<U128> {
+    fn redeem(&mut self, shares: U128, receiver_id: Option<AccountId>) -> PromiseOrValue<U128> {
         let owner = env::predecessor_account_id();
-        let receiver = receiver.unwrap_or(owner.clone());
+        let receiver_id = receiver_id.unwrap_or(owner.clone());
         
         let assets = self.convert_to_assets_internal(shares.0, Rounding::Down);
 
@@ -223,7 +209,7 @@ impl FungibleTokenVaultCore for ERC4626Vault {
 
         // Transfer underlying assets and return promise
         PromiseOrValue::Promise(
-            self.internal_transfer_assets(receiver, assets)
+            self.internal_transfer_assets(receiver_id, assets)
         )
     }
 
@@ -235,7 +221,7 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         U128(self.convert_to_assets_internal(shares.0, Rounding::Down))
     }
 
-    fn max_deposit(&self, _receiver: AccountId) -> U128 {
+    fn max_deposit(&self, receiver_id: AccountId) -> U128 {
         U128(u128::MAX - self.total_assets)
     }
 
@@ -243,8 +229,8 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         self.convert_to_shares(assets)
     }
 
-    fn max_redeem(&self, owner: AccountId) -> U128 {
-        self.token.ft_balance_of(owner)
+    fn max_redeem(&self, owner_id: AccountId) -> U128 {
+        self.token.ft_balance_of(owner_id)
     }
 
     fn preview_redeem(&self, shares: U128) -> U128 {
