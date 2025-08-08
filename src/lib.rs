@@ -12,6 +12,7 @@ use near_contract_standards::fungible_token::{
 };
 use near_contract_standards::storage_management::StorageManagement;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::collections::LookupMap;
 use near_sdk::json_types::U128;
 use near_sdk::{
     env, near_bindgen, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue,
@@ -25,6 +26,13 @@ use crate::multi_token::MultiTokenReceiver;
 
 const GAS_FOR_FT_TRANSFER: Gas = Gas::from_tgas(30);
 
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct PendingWithdrawal {
+    pub shares: u128,
+    pub assets: u128,
+    pub receiver: AccountId,
+}
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct ERC4626Vault {
@@ -33,6 +41,7 @@ pub struct ERC4626Vault {
     asset: AssetType,                // Underlying asset (NEP-141 or NEP-245)
     total_assets: u128,              // Total managed assets
     owner: AccountId,                // Vault owner
+    pending_withdrawals: LookupMap<AccountId, PendingWithdrawal>, // Track pending withdrawals
 }
 
 #[near_bindgen]
@@ -59,6 +68,7 @@ impl ERC4626Vault {
             asset,
             total_assets: 0,
             owner: env::predecessor_account_id(),
+            pending_withdrawals: LookupMap::new(b"p"),
         }
     }
 
@@ -69,8 +79,14 @@ impl ERC4626Vault {
 
     // ===== Internal Helpers =====
 
-    fn internal_transfer_assets(&self, receiver_id: AccountId, amount: u128) -> Promise {
-        match &self.asset {
+    fn internal_transfer_assets_with_callback(
+        &self,
+        receiver_id: AccountId,
+        amount: u128,
+        owner: AccountId,
+        shares: u128,
+    ) -> Promise {
+        let transfer_promise = match &self.asset {
             AssetType::FungibleToken { contract_id } => {
                 Promise::new(contract_id.clone()).function_call(
                     "ft_transfer".to_string(),
@@ -82,8 +98,11 @@ impl ERC4626Vault {
                     NearToken::from_yoctonear(1),
                     GAS_FOR_FT_TRANSFER,
                 )
-            },
-            AssetType::MultiToken { contract_id, token_id } => {
+            }
+            AssetType::MultiToken {
+                contract_id,
+                token_id,
+            } => {
                 Promise::new(contract_id.clone()).function_call(
                     "mt_transfer".to_string(),
                     format!(
@@ -94,6 +113,110 @@ impl ERC4626Vault {
                     NearToken::from_yoctonear(1),
                     GAS_FOR_FT_TRANSFER,
                 )
+            }
+        };
+
+        // Chain with callback to handle success/failure
+        transfer_promise.then(
+            Promise::new(env::current_account_id()).function_call(
+                "resolve_withdraw".to_string(),
+                format!(
+                    r#"{{"owner": "{}", "receiver": "{}", "shares": "{}", "assets": "{}"}}"#,
+                    owner, receiver_id, shares, amount
+                )
+                .into_bytes(),
+                NearToken::from_yoctonear(0),
+                Gas::from_tgas(10),
+            ),
+        )
+    }
+
+    fn internal_execute_withdrawal(
+        &mut self,
+        owner: AccountId,
+        receiver_id: Option<AccountId>,
+        shares_to_burn: u128,
+        assets_to_transfer: u128,
+    ) -> Promise {
+        let receiver_id = receiver_id.unwrap_or(owner.clone());
+
+        // Checks
+        assert!(
+            self.pending_withdrawals.get(&owner).is_none(),
+            "Withdrawal already pending for this account"
+        );
+        assert!(
+            self.token.ft_balance_of(owner.clone()).0 >= shares_to_burn,
+            "Insufficient shares"
+        );
+        assert!(assets_to_transfer > 0, "No assets to withdraw");
+        assert!(
+            assets_to_transfer <= self.total_assets,
+            "Insufficient vault assets"
+        );
+
+        // Effects - CEI Pattern: Update state before external call
+        // Mark withdrawal as pending (this prevents double-spending)
+        let pending = PendingWithdrawal {
+            shares: shares_to_burn,
+            assets: assets_to_transfer,
+            receiver: receiver_id.clone(),
+        };
+        self.pending_withdrawals.insert(&owner, &pending);
+
+        // Burn shares immediately (prevents reuse)
+        self.token.internal_withdraw(&owner, shares_to_burn);
+        self.total_assets -= assets_to_transfer;
+
+        // Interactions - External call
+        self.internal_transfer_assets_with_callback(
+            receiver_id,
+            assets_to_transfer,
+            owner,
+            shares_to_burn,
+        )
+    }
+
+    #[private]
+    pub fn resolve_withdraw(
+        &mut self,
+        owner: AccountId,
+        receiver: AccountId,
+        shares: U128,
+        assets: U128,
+    ) -> U128 {
+        // Check if the transfer succeeded
+        match env::promise_result(0) {
+            near_sdk::PromiseResult::Successful(_) => {
+                // Transfer succeeded - finalize withdrawal
+                // State was already updated in the main function (CEI pattern)
+                // Just clean up pending state and emit event
+
+                self.pending_withdrawals.remove(&owner);
+
+                // Emit VaultWithdraw event
+                VaultWithdraw {
+                    owner_id: &owner,
+                    receiver_id: &receiver,
+                    assets,
+                    shares,
+                    memo: None,
+                }
+                .emit();
+
+                assets
+            }
+            _ => {
+                // Transfer failed - rollback state changes
+                if let Some(pending_withdrawal) = self.pending_withdrawals.remove(&owner) {
+                    // Restore shares that were burned
+                    self.token
+                        .internal_deposit(&owner, pending_withdrawal.shares);
+                    // Restore total_assets that was reduced
+                    self.total_assets += pending_withdrawal.assets;
+                }
+
+                env::panic_str("Asset transfer failed - state rolled back")
             }
         }
     }
@@ -187,50 +310,26 @@ impl FungibleTokenVaultCore for ERC4626Vault {
 
     fn redeem(&mut self, shares: U128, receiver_id: Option<AccountId>) -> PromiseOrValue<U128> {
         let owner = env::predecessor_account_id();
-        let receiver_id = receiver_id.unwrap_or(owner.clone());
-
         let assets = self.convert_to_assets_internal(shares.0, Rounding::Down);
 
-        // Burn shares
-        self.token.internal_withdraw(&owner, shares.0);
-        self.total_assets -= assets;
-
-        // Emit VaultWithdraw event
-        VaultWithdraw {
-            owner_id: &owner,
-            receiver_id: &receiver_id,
-            assets: U128(assets),
-            shares,
-            memo: None,
-        }
-        .emit();
-
-        // Transfer underlying assets and return promise
-        PromiseOrValue::Promise(self.internal_transfer_assets(receiver_id, assets))
+        PromiseOrValue::Promise(self.internal_execute_withdrawal(
+            owner,
+            receiver_id,
+            shares.0,
+            assets,
+        ))
     }
 
     fn withdraw(&mut self, assets: U128, receiver_id: Option<AccountId>) -> PromiseOrValue<U128> {
         let owner = env::predecessor_account_id();
-        let receiver_id = receiver_id.unwrap_or(owner.clone());
-
         let shares = self.convert_to_shares_internal(assets.0, Rounding::Up);
 
-        // Burn shares
-        self.token.internal_withdraw(&owner, shares);
-        self.total_assets -= assets.0;
-
-        // Emit VaultWithdraw event
-        VaultWithdraw {
-            owner_id: &owner,
-            receiver_id: &receiver_id,
-            assets,
-            shares: U128(shares),
-            memo: None,
-        }
-        .emit();
-
-        // Transfer underlying assets
-        PromiseOrValue::Promise(self.internal_transfer_assets(receiver_id, assets.0))
+        PromiseOrValue::Promise(self.internal_execute_withdrawal(
+            owner,
+            receiver_id,
+            shares,
+            assets.0,
+        ))
     }
 
     fn convert_to_shares(&self, assets: U128) -> U128 {
