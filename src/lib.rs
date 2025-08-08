@@ -18,6 +18,7 @@ use near_sdk::{
 };
 
 use crate::asset_type::AssetType;
+use crate::contract_standards::events::{VaultDeposit, VaultWithdraw};
 use crate::contract_standards::FungibleTokenVaultCore;
 use crate::mul_div::{mul_div, Rounding};
 use crate::multi_token::MultiTokenReceiver;
@@ -151,6 +152,15 @@ impl ERC4626Vault {
                 let shares = self.convert_to_shares_internal(amount.0, Rounding::Down);
                 self.token.internal_deposit(&sender_id, shares);
                 self.total_assets += amount.0;
+
+                // Emit VaultDeposit event
+                VaultDeposit {
+                    sender_id: &sender_id,
+                    owner_id: &sender_id,
+                    assets: amount,
+                    shares: U128(shares),
+                    memo: None,
+                }.emit();
             } else {
                 // Just track assets without minting shares
                 self.total_assets += amount.0;
@@ -184,6 +194,15 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         self.token.internal_withdraw(&owner, shares.0);
         self.total_assets -= assets;
 
+        // Emit VaultWithdraw event
+        VaultWithdraw {
+            owner_id: &owner,
+            receiver_id: &receiver_id,
+            assets: U128(assets),
+            shares,
+            memo: None,
+        }.emit();
+
         // Transfer underlying assets and return promise
         PromiseOrValue::Promise(
             self.internal_transfer_assets(receiver_id, assets)
@@ -200,6 +219,15 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         // Burn shares
         self.token.internal_withdraw(&owner, shares);
         self.total_assets -= assets.0;
+
+        // Emit VaultWithdraw event
+        VaultWithdraw {
+            owner_id: &owner,
+            receiver_id: &receiver_id,
+            assets,
+            shares: U128(shares),
+            memo: None,
+        }.emit();
 
         // Transfer underlying assets
         PromiseOrValue::Promise(
@@ -232,7 +260,7 @@ impl FungibleTokenVaultCore for ERC4626Vault {
     }
 
     fn max_withdraw(&self, owner: AccountId) -> U128 {
-       U128(self.convert_to_shares_internal(self.token.ft_balance_of(owner).0, Rounding::Down))
+        U128(self.convert_to_shares_internal(self.token.ft_balance_of(owner).0, Rounding::Down))
     }
 
     fn preview_withdraw(&self, assets: U128) -> U128 {
@@ -260,6 +288,15 @@ impl FungibleTokenReceiver for ERC4626Vault {
                 let shares = self.convert_to_shares(amount).0;
                 self.token.internal_deposit(&sender_id, shares);
                 self.total_assets += amount.0;
+
+                // Emit VaultDeposit event
+                VaultDeposit {
+                    sender_id: &sender_id,
+                    owner_id: &sender_id,
+                    assets: amount,
+                    shares: U128(shares),
+                    memo: None,
+                }.emit();
             } else {
                 // Just track assets without minting shares
                 self.total_assets += amount.0;
