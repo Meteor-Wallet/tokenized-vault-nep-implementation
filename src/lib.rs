@@ -66,29 +66,6 @@ impl ERC4626Vault {
         self.asset.clone()
     }
 
-    pub fn max_withdraw(&self, owner: AccountId) -> U128 {
-        self.convert_to_assets(self.token.ft_balance_of(owner))
-    }
-
-    // ===== Withdraw =====
-    
-    pub fn withdraw(&mut self, assets: U128, receiver_id: AccountId, owner: AccountId) -> Promise {
-        assert_eq!(
-            env::predecessor_account_id(),
-            owner,
-            "Only owner can withdraw"
-        );
-
-        let shares = self.convert_to_shares_internal(assets.0, Rounding::Up);
-
-        // Burn shares
-        self.token.internal_withdraw(&owner, shares);
-        self.total_assets -= assets.0;
-
-        // Transfer underlying assets
-        self.internal_transfer_assets(receiver_id, assets.0)
-    }
-
     // ===== Internal Helpers =====
 
     fn internal_transfer_assets(&self, receiver_id: AccountId, amount: u128) -> Promise {
@@ -213,6 +190,23 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         )
     }
 
+    fn withdraw(&mut self, assets: U128, receiver_id: Option<AccountId>) -> PromiseOrValue<U128> {
+        let owner = env::predecessor_account_id();
+        let receiver_id = receiver_id.unwrap_or(owner.clone());
+
+
+        let shares = self.convert_to_shares_internal(assets.0, Rounding::Up);
+
+        // Burn shares
+        self.token.internal_withdraw(&owner, shares);
+        self.total_assets -= assets.0;
+
+        // Transfer underlying assets
+        PromiseOrValue::Promise(
+            self.internal_transfer_assets(receiver_id, assets.0)
+        )
+    }
+
     fn convert_to_shares(&self, assets: U128) -> U128 {
         U128(self.convert_to_shares_internal(assets.0, Rounding::Down))
     }
@@ -235,6 +229,14 @@ impl FungibleTokenVaultCore for ERC4626Vault {
 
     fn preview_redeem(&self, shares: U128) -> U128 {
         self.convert_to_assets(shares)
+    }
+
+    fn max_withdraw(&self, owner: AccountId) -> U128 {
+       U128(self.convert_to_shares_internal(self.token.ft_balance_of(owner).0, Rounding::Down))
+    }
+
+    fn preview_withdraw(&self, assets: U128) -> U128 {
+        U128(self.convert_to_shares_internal(assets.0, Rounding::Up))
     }
 }
 

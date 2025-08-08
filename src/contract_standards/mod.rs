@@ -13,6 +13,7 @@ pub trait FungibleTokenVaultCore: FungibleTokenCore + FungibleTokenReceiver {
     fn asset(&self) -> AccountId;
     fn total_assets(&self) -> U128;
     fn redeem(&mut self, shares: U128, receiver_id: Option<AccountId>) -> PromiseOrValue<U128>;
+    fn withdraw(&mut self, assets: U128, receiver_id: Option<AccountId>) -> PromiseOrValue<U128>;
 
     fn convert_to_shares(&self, assets: U128) -> U128 {
         if (self.total_assets().0 == 0u128) {
@@ -56,5 +57,14 @@ pub trait FungibleTokenVaultCore: FungibleTokenCore + FungibleTokenReceiver {
     fn preview_redeem(&self, shares: U128) -> U128 {
         assert!(shares <= self.max_redeem(near_sdk::env::predecessor_account_id()));
         self.convert_to_assets(shares)
+    }
+
+    fn max_withdraw(&self, owner_id: AccountId) -> U128 {
+        self.convert_to_assets(self.ft_balance_of(owner_id))
+    }
+
+    fn preview_withdraw(&self, assets: U128) -> U128 {
+        assert!(assets <= self.max_withdraw(near_sdk::env::predecessor_account_id()));
+        self.convert_to_shares(assets)
     }
 }
