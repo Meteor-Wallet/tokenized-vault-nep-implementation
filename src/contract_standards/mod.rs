@@ -1,7 +1,12 @@
 use near_contract_standards::fungible_token::{receiver::FungibleTokenReceiver, FungibleTokenCore};
 use near_sdk::{json_types::U128, AccountId, PromiseOrValue};
+use uint::construct_uint;
 
 pub mod events;
+
+construct_uint! {
+    pub struct U256(4);
+}
 
 #[allow(unused)]
 pub trait FungibleTokenVaultCore: FungibleTokenCore + FungibleTokenReceiver {
@@ -14,28 +19,24 @@ pub trait FungibleTokenVaultCore: FungibleTokenCore + FungibleTokenReceiver {
             return assets;
         }
 
-        // TODO: upscale u128 to become u256 when multiplying/dividing, then downscale to u128
-        // to avoid overflow. Perform checks to ensure no overflow occurs.
-        self.ft_total_supply()
-            .0
-            .checked_mul(assets.0)
+        U256::from(self.ft_total_supply().0)
+            .checked_mul(U256::from(assets.0))
             .expect("Too much assets")
-            .checked_div(self.total_assets().0)
+            .checked_div(U256::from(self.total_assets().0))
             .unwrap()
+            .as_u128()
             .into()
     }
 
     fn convert_to_assets(&self, shares: U128) -> U128 {
         assert!(self.ft_total_supply().0 > 0, "No shares issued yet");
 
-        // TODO: upscale u128 to become u256 when multiplying/dividing, then downscale to u128
-        // to avoid overflow. Perform checks to ensure no overflow occurs.
-        shares
-            .0
-            .checked_mul(self.total_assets().0)
+        U256::from(shares.0)
+            .checked_mul(U256::from(self.total_assets().0))
             .expect("Too many shares")
-            .checked_div(self.ft_total_supply().0)
+            .checked_div(U256::from(self.ft_total_supply().0))
             .unwrap()
+            .as_u128()
             .into()
     }
 
