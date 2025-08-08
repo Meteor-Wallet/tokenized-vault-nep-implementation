@@ -85,6 +85,7 @@ impl ERC4626Vault {
         amount: u128,
         owner: AccountId,
         shares: u128,
+        memo: Option<String>,
     ) -> Promise {
         let transfer_promise = match &self.asset {
             AssetType::FungibleToken { contract_id } => {
@@ -121,8 +122,9 @@ impl ERC4626Vault {
             Promise::new(env::current_account_id()).function_call(
                 "resolve_withdraw".to_string(),
                 format!(
-                    r#"{{"owner": "{}", "receiver": "{}", "shares": "{}", "assets": "{}"}}"#,
-                    owner, receiver_id, shares, amount
+                    r#"{{"owner": "{}", "receiver": "{}", "shares": "{}", "assets": "{}", "memo": {}}}"#,
+                    owner, receiver_id, shares, amount,
+                    memo.as_ref().map(|m| format!("\"{}\"", m)).unwrap_or("null".to_string())
                 )
                 .into_bytes(),
                 NearToken::from_yoctonear(0),
@@ -137,6 +139,7 @@ impl ERC4626Vault {
         receiver_id: Option<AccountId>,
         shares_to_burn: u128,
         assets_to_transfer: u128,
+        memo: Option<String>,
     ) -> Promise {
         let receiver_id = receiver_id.unwrap_or(owner.clone());
 
@@ -174,6 +177,7 @@ impl ERC4626Vault {
             assets_to_transfer,
             owner,
             shares_to_burn,
+            memo,
         )
     }
 
@@ -184,6 +188,7 @@ impl ERC4626Vault {
         receiver: AccountId,
         shares: U128,
         assets: U128,
+        memo: Option<String>,
     ) -> U128 {
         // Check if the transfer succeeded
         match env::promise_result(0) {
@@ -200,7 +205,7 @@ impl ERC4626Vault {
                     receiver_id: &receiver,
                     assets,
                     shares,
-                    memo: None,
+                    memo: memo.as_deref(),
                 }
                 .emit();
 
@@ -308,7 +313,12 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         U128(self.total_assets)
     }
 
-    fn redeem(&mut self, shares: U128, receiver_id: Option<AccountId>) -> PromiseOrValue<U128> {
+    fn redeem(
+        &mut self,
+        shares: U128,
+        receiver_id: Option<AccountId>,
+        memo: Option<String>,
+    ) -> PromiseOrValue<U128> {
         let owner = env::predecessor_account_id();
         let assets = self.convert_to_assets_internal(shares.0, Rounding::Down);
 
@@ -317,10 +327,16 @@ impl FungibleTokenVaultCore for ERC4626Vault {
             receiver_id,
             shares.0,
             assets,
+            memo,
         ))
     }
 
-    fn withdraw(&mut self, assets: U128, receiver_id: Option<AccountId>) -> PromiseOrValue<U128> {
+    fn withdraw(
+        &mut self,
+        assets: U128,
+        receiver_id: Option<AccountId>,
+        memo: Option<String>,
+    ) -> PromiseOrValue<U128> {
         let owner = env::predecessor_account_id();
         let shares = self.convert_to_shares_internal(assets.0, Rounding::Up);
 
@@ -329,6 +345,7 @@ impl FungibleTokenVaultCore for ERC4626Vault {
             receiver_id,
             shares,
             assets.0,
+            memo,
         ))
     }
 
