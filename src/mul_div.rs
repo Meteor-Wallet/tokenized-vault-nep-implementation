@@ -5,17 +5,20 @@ pub enum Rounding {
 }
 
 pub fn mul_div(x: u128, y: u128, denominator: u128, rounding: Rounding) -> u128 {
-    let numerator = x.checked_mul(y).expect("mul overflow");
-    let quotient = numerator / denominator;
+    use crate::contract_standards::U256;
+    
+    let numerator = U256::from(x) * U256::from(y);
+    let denominator = U256::from(denominator);
+    let result = numerator / denominator;
     let remainder = numerator % denominator;
 
     match rounding {
-        Rounding::Down => quotient,
+        Rounding::Down => result.as_u128(),
         Rounding::Up => {
-            if remainder > 0 {
-                quotient + 1
+            if remainder > U256::zero() {
+                result.as_u128() + 1
             } else {
-                quotient
+                result.as_u128()
             }
         }
     }
