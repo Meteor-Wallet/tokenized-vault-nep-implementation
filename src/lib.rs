@@ -12,7 +12,6 @@ use near_contract_standards::fungible_token::{
 };
 use near_contract_standards::storage_management::StorageManagement;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::LookupMap;
 use near_sdk::json_types::U128;
 use near_sdk::{
     env, near_bindgen, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue,
@@ -26,13 +25,6 @@ use crate::multi_token::MultiTokenReceiver;
 
 const GAS_FOR_FT_TRANSFER: Gas = Gas::from_tgas(30);
 
-#[derive(BorshDeserialize, BorshSerialize)]
-pub struct PendingWithdrawal {
-    pub shares: u128,
-    pub assets: u128,
-    pub receiver: AccountId,
-}
-
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct ERC4626Vault {
@@ -41,7 +33,6 @@ pub struct ERC4626Vault {
     asset: AssetType,                // Underlying asset (NEP-141 or NEP-245)
     total_assets: u128,              // Total managed assets
     owner: AccountId,                // Vault owner
-    pending_withdrawals: LookupMap<AccountId, PendingWithdrawal>, // Track pending withdrawals
 }
 
 #[near_bindgen]
@@ -68,7 +59,6 @@ impl ERC4626Vault {
             asset,
             total_assets: 0,
             owner: env::predecessor_account_id(),
-            pending_withdrawals: LookupMap::new(b"p"),
         }
     }
 
@@ -145,10 +135,6 @@ impl ERC4626Vault {
 
         // Checks
         assert!(
-            self.pending_withdrawals.get(&owner).is_none(),
-            "Withdrawal already pending for this account"
-        );
-        assert!(
             self.token.ft_balance_of(owner.clone()).0 >= shares_to_burn,
             "Insufficient shares"
         );
@@ -159,14 +145,6 @@ impl ERC4626Vault {
         );
 
         // Effects - CEI Pattern: Update state before external call
-        // Mark withdrawal as pending (this prevents double-spending)
-        let pending = PendingWithdrawal {
-            shares: shares_to_burn,
-            assets: assets_to_transfer,
-            receiver: receiver_id.clone(),
-        };
-        self.pending_withdrawals.insert(&owner, &pending);
-
         // Burn shares immediately (prevents reuse)
         self.token.internal_withdraw(&owner, shares_to_burn);
         self.total_assets -= assets_to_transfer;
@@ -194,10 +172,6 @@ impl ERC4626Vault {
         match env::promise_result(0) {
             near_sdk::PromiseResult::Successful(_) => {
                 // Transfer succeeded - finalize withdrawal
-                // State was already updated in the main function (CEI pattern)
-                // Just clean up pending state and emit event
-
-                self.pending_withdrawals.remove(&owner);
 
                 // Emit VaultWithdraw event
                 VaultWithdraw {
@@ -212,14 +186,11 @@ impl ERC4626Vault {
                 assets
             }
             _ => {
-                // Transfer failed - rollback state changes
-                if let Some(pending_withdrawal) = self.pending_withdrawals.remove(&owner) {
-                    // Restore shares that were burned
-                    self.token
-                        .internal_deposit(&owner, pending_withdrawal.shares);
-                    // Restore total_assets that was reduced
-                    self.total_assets += pending_withdrawal.assets;
-                }
+                // Transfer failed - rollback state changes using callback parameters
+                // Restore shares that were burned
+                self.token.internal_deposit(&owner, shares.0);
+                // Restore total_assets that was reduced
+                self.total_assets += assets.0;
 
                 env::panic_str("Asset transfer failed - state rolled back")
             }
