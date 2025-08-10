@@ -147,26 +147,20 @@ impl ERC4626Vault {
 
             let amount = amounts[0];
 
-            // Check message to determine action
-            if msg == "deposit" {
-                // Deposit: mint shares to sender
-                let shares = self.convert_to_shares_internal(amount.0, Rounding::Down);
-                self.token.internal_deposit(&sender_id, shares);
-                self.total_assets += amount.0;
+            // Deposit: mint shares to sender
+            let shares = self.convert_to_shares_internal(amount.0, Rounding::Down);
+            self.token.internal_deposit(&sender_id, shares);
+            self.total_assets += amount.0;
 
-                // Emit VaultDeposit event
-                VaultDeposit {
-                    sender_id: &sender_id,
-                    owner_id: &sender_id,
-                    assets: amount,
-                    shares: U128(shares),
-                    memo: None,
-                }
-                .emit();
-            } else {
-                // Just track assets without minting shares
-                self.total_assets += amount.0;
+            // Emit VaultDeposit event
+            VaultDeposit {
+                sender_id: &sender_id,
+                owner_id: &sender_id,
+                assets: amount,
+                shares: U128(shares),
+                memo: None,
             }
+            .emit();
 
             vec![U128(0)] // Accept all tokens
         } else {
