@@ -174,26 +174,6 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         U128(self.convert_to_assets_internal(shares.0, Rounding::Down))
     }
 
-    fn max_deposit(&self, receiver_id: AccountId) -> U128 {
-        U128(u128::MAX - self.total_assets().0)
-    }
-
-    fn preview_deposit(&self, assets: U128) -> U128 {
-        self.convert_to_shares(assets)
-    }
-
-    fn max_redeem(&self, owner_id: AccountId) -> U128 {
-        self.token.ft_balance_of(owner_id)
-    }
-
-    fn preview_redeem(&self, shares: U128) -> U128 {
-        self.convert_to_assets(shares)
-    }
-
-    fn max_withdraw(&self, owner: AccountId) -> U128 {
-        self.convert_to_assets(self.ft_balance_of(owner))
-    }
-
     fn preview_withdraw(&self, assets: U128) -> U128 {
         U128(self.convert_to_shares_internal(assets.0, Rounding::Up))
     }
