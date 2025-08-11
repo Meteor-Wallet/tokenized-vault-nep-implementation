@@ -64,7 +64,9 @@ impl ERC4626Vault {
         }
     }
 
-    // ===== View Functions =====
+    // TODO: Either the NEP spec needed to be changed, or the asset type needed to be changed
+    // A string can not represent the underlying asset if the asset is NEP-245
+    // Further edit after Edward makes decision
     pub fn asset_type(&self) -> AssetType {
         self.asset.clone()
     }
@@ -111,6 +113,9 @@ impl ERC4626Vault {
 // ===== Implement FungibleTokenVaultCore Trait =====
 #[near_bindgen]
 impl FungibleTokenVaultCore for ERC4626Vault {
+    // TODO: Either the NEP spec needed to be changed, or the asset type needed to be changed
+    // A string can not represent the underlying asset if the asset is NEP-245
+    // Further edit after Edward makes decision
     fn asset(&self) -> AccountId {
         self.asset.contract_id().clone()
     }
