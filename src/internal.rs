@@ -109,7 +109,7 @@ impl ERC4626Vault {
         )
     }
 
-    pub fn convert_to_shares_internal(&self, assets: u128, rounding: Rounding) -> u128 {
+    pub fn internal_convert_to_shares(&self, assets: u128, rounding: Rounding) -> u128 {
         let total_supply = self.token.ft_total_supply().0;
 
         let supply_adj = total_supply;
@@ -118,7 +118,7 @@ impl ERC4626Vault {
         mul_div(assets, supply_adj, assets_adj, rounding)
     }
 
-    pub fn convert_to_assets_internal(&self, shares: u128, rounding: Rounding) -> u128 {
+    pub fn internal_convert_to_assets(&self, shares: u128, rounding: Rounding) -> u128 {
         let total_supply = self.token.ft_total_supply().0;
 
         if total_supply == 0 {
@@ -135,7 +135,7 @@ impl ERC4626Vault {
     /// Handle MT transfers to the vault
     /// - If msg is "deposit": mint vault shares to sender
     /// - Otherwise: just track assets without minting shares (for donations/yield additions)
-    pub fn handle_mt_deposit(
+    pub fn internal_handle_mt_deposit(
         &mut self,
         sender_id: AccountId,
         token_ids: Vec<String>,
@@ -158,7 +158,7 @@ impl ERC4626Vault {
             let amount = amounts[0];
 
             // Deposit: mint shares to sender
-            let shares = self.convert_to_shares_internal(amount.0, Rounding::Down);
+            let shares = self.internal_convert_to_shares(amount.0, Rounding::Down);
             self.token.internal_deposit(&sender_id, shares);
             self.total_assets += amount.0;
 

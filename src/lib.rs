@@ -146,7 +146,7 @@ impl FungibleTokenVaultCore for ERC4626Vault {
             "Exceeds max redeem"
         );
 
-        let assets = self.convert_to_assets_internal(shares.0, Rounding::Down);
+        let assets = self.internal_convert_to_assets(shares.0, Rounding::Down);
 
         PromiseOrValue::Promise(self.internal_execute_withdrawal(
             owner,
@@ -172,7 +172,7 @@ impl FungibleTokenVaultCore for ERC4626Vault {
             "Exceeds max withdraw"
         );
 
-        let shares = self.convert_to_shares_internal(assets.0, Rounding::Up);
+        let shares = self.internal_convert_to_shares(assets.0, Rounding::Up);
 
         PromiseOrValue::Promise(self.internal_execute_withdrawal(
             owner,
@@ -184,15 +184,15 @@ impl FungibleTokenVaultCore for ERC4626Vault {
     }
 
     fn convert_to_shares(&self, assets: U128) -> U128 {
-        U128(self.convert_to_shares_internal(assets.0, Rounding::Down))
+        U128(self.internal_convert_to_shares(assets.0, Rounding::Down))
     }
 
     fn convert_to_assets(&self, shares: U128) -> U128 {
-        U128(self.convert_to_assets_internal(shares.0, Rounding::Down))
+        U128(self.internal_convert_to_assets(shares.0, Rounding::Down))
     }
 
     fn preview_withdraw(&self, assets: U128) -> U128 {
-        U128(self.convert_to_shares_internal(assets.0, Rounding::Up))
+        U128(self.internal_convert_to_shares(assets.0, Rounding::Up))
     }
 }
 
@@ -286,7 +286,7 @@ impl MultiTokenReceiver for ERC4626Vault {
         amounts: Vec<U128>,
         msg: String,
     ) -> Vec<U128> {
-        self.handle_mt_deposit(sender_id, token_ids, amounts, msg)
+        self.internal_handle_mt_deposit(sender_id, token_ids, amounts, msg)
     }
 }
 
