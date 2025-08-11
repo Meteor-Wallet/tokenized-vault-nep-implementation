@@ -186,7 +186,7 @@ impl FungibleTokenVaultCore for ERC4626Vault {
     }
 
     fn max_withdraw(&self, owner: AccountId) -> U128 {
-        U128(self.convert_to_shares_internal(self.token.ft_balance_of(owner).0, Rounding::Down))
+        U128(self.convert_to_assets_internal(self.token.ft_balance_of(owner).0, Rounding::Down))
     }
 
     fn preview_withdraw(&self, assets: U128) -> U128 {
