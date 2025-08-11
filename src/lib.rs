@@ -23,7 +23,7 @@ use near_sdk::{json_types::U128, BorshStorageKey};
 
 use crate::asset_type::AssetType;
 use crate::contract_standards::events::{VaultDeposit, VaultWithdraw};
-use crate::contract_standards::FungibleTokenVaultCore;
+use crate::contract_standards::VaultCore;
 use crate::mul_div::Rounding;
 use crate::multi_token::MultiTokenReceiver;
 
@@ -118,7 +118,7 @@ impl ERC4626Vault {
 
 // ===== Implement FungibleTokenVaultCore Trait =====
 #[near_bindgen]
-impl FungibleTokenVaultCore for ERC4626Vault {
+impl VaultCore for ERC4626Vault {
     // TODO: Either the NEP spec needed to be changed, or the asset type needed to be changed
     // A string can not represent the underlying asset if the asset is NEP-245
     // Further edit after Edward makes decision

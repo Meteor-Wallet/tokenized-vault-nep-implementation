@@ -1,5 +1,9 @@
 use near_contract_standards::fungible_token::{receiver::FungibleTokenReceiver, FungibleTokenCore};
-use near_sdk::{json_types::U128, AccountId, PromiseOrValue};
+use near_sdk::{
+    json_types::U128,
+    serde::{Deserialize, Serialize},
+    AccountId, PromiseOrValue,
+};
 use uint::construct_uint;
 
 pub mod events;
@@ -8,9 +12,21 @@ construct_uint! {
     pub struct U256(4);
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub enum Asset {
+    FungibleToken {
+        contract_id: AccountId,
+    },
+    MultiToken {
+        contract_id: AccountId,
+        token_id: String,
+    },
+}
+
 #[allow(unused)]
-pub trait FungibleTokenVaultCore: FungibleTokenCore + FungibleTokenReceiver {
-    fn asset(&self) -> AccountId;
+pub trait VaultCore: FungibleTokenCore + FungibleTokenReceiver {
+    fn asset(&self) -> Asset;
     fn total_assets(&self) -> U128;
     fn redeem(
         &mut self,
