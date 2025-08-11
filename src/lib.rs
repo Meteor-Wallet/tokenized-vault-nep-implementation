@@ -229,19 +229,15 @@ impl FungibleTokenReceiver for ERC4626Vault {
         };
 
         let used_amount = self.internal_convert_to_assets(shares, Rounding::Up);
-        let unused_amount = amount.0 - used_amount;
+        let unused_amount = amount
+            .0
+            .checked_sub(used_amount)
+            .expect("Overflow in unused amount calculation");
 
         assert!(
             used_amount > 0,
             "No assets to deposit, shares: {}, amount: {}",
             shares,
-            amount.0
-        );
-
-        assert!(
-            unused_amount >= 0,
-            "Used more assets than transfered used {}, transfered {}",
-            used_amount,
             amount.0
         );
 
