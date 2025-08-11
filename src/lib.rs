@@ -12,8 +12,11 @@ use near_contract_standards::fungible_token::{
     FungibleTokenResolver,
 };
 use near_contract_standards::storage_management::StorageManagement;
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
+use near_sdk::{
+    assert_one_yocto,
+    borsh::{self, BorshDeserialize, BorshSerialize},
+};
 use near_sdk::{env, near_bindgen, AccountId, Gas, NearToken, PanicOnDefault, PromiseOrValue};
 
 use crate::asset_type::AssetType;
@@ -116,12 +119,15 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         U128(self.total_assets)
     }
 
+    #[payable]
     fn redeem(
         &mut self,
         shares: U128,
         receiver_id: Option<AccountId>,
         memo: Option<String>,
     ) -> PromiseOrValue<U128> {
+        assert_one_yocto();
+
         let owner = env::predecessor_account_id();
         let assets = self.convert_to_assets_internal(shares.0, Rounding::Down);
 
@@ -134,12 +140,15 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         ))
     }
 
+    #[payable]
     fn withdraw(
         &mut self,
         assets: U128,
         receiver_id: Option<AccountId>,
         memo: Option<String>,
     ) -> PromiseOrValue<U128> {
+        assert_one_yocto();
+
         let owner = env::predecessor_account_id();
         let shares = self.convert_to_shares_internal(assets.0, Rounding::Up);
 
