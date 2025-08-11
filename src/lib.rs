@@ -16,6 +16,7 @@ use near_contract_standards::storage_management::StorageManagement;
 use near_sdk::{
     assert_one_yocto,
     borsh::{self, BorshDeserialize, BorshSerialize},
+    serde::Deserialize,
 };
 use near_sdk::{env, near_bindgen, AccountId, Gas, NearToken, PanicOnDefault, PromiseOrValue};
 use near_sdk::{json_types::U128, BorshStorageKey};
@@ -27,6 +28,12 @@ use crate::mul_div::Rounding;
 use crate::multi_token::MultiTokenReceiver;
 
 const GAS_FOR_FT_TRANSFER: Gas = Gas::from_tgas(30);
+
+#[derive(Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct DepositMessage {
+    memo: String,
+}
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -207,6 +214,11 @@ impl FungibleTokenReceiver for ERC4626Vault {
                 "Only the underlying asset can be deposited"
             );
 
+            let memo = match serde_json::from_str::<DepositMessage>(&msg) {
+                Ok(deposit_message) => Some(deposit_message.memo),
+                Err(_) => None,
+            };
+
             // Check message to determine action
             if msg == "deposit" {
                 // Deposit: mint shares to sender
@@ -227,7 +239,7 @@ impl FungibleTokenReceiver for ERC4626Vault {
                     owner_id: &sender_id,
                     assets: amount,
                     shares: U128(shares),
-                    memo: None,
+                    memo: memo.as_deref(),
                 }
                 .emit();
             } else {

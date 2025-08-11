@@ -8,7 +8,7 @@ use crate::{
     asset_type::AssetType,
     contract_standards::events::VaultDeposit,
     mul_div::{mul_div, Rounding},
-    ERC4626Vault, GAS_FOR_FT_TRANSFER,
+    DepositMessage, ERC4626Vault, GAS_FOR_FT_TRANSFER,
 };
 
 impl ERC4626Vault {
@@ -162,6 +162,11 @@ impl ERC4626Vault {
             self.token.internal_deposit(&sender_id, shares);
             self.total_assets += amount.0;
 
+            let memo = match serde_json::from_str::<DepositMessage>(&msg) {
+                Ok(deposit_message) => Some(deposit_message.memo),
+                Err(_) => None,
+            };
+
             FtMint {
                 owner_id: &sender_id,
                 amount: U128(shares),
@@ -175,7 +180,7 @@ impl ERC4626Vault {
                 owner_id: &sender_id,
                 assets: amount,
                 shares: U128(shares),
-                memo: None,
+                memo: memo.as_deref(),
             }
             .emit();
 
