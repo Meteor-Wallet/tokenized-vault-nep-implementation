@@ -1,11 +1,5 @@
-use borsh::{BorshDeserialize, BorshSerialize};
 use near_contract_standards::fungible_token::{receiver::FungibleTokenReceiver, FungibleTokenCore};
-use near_sdk::{
-    json_types::U128,
-    serde::{Deserialize, Serialize},
-    AccountId, PromiseOrValue,
-};
-use schemars::JsonSchema;
+use near_sdk::{json_types::U128, AccountId, PromiseOrValue};
 use uint::construct_uint;
 
 pub mod events;
@@ -14,33 +8,9 @@ construct_uint! {
     pub struct U256(4);
 }
 
-#[derive(
-    BorshSerialize,
-    BorshDeserialize,
-    Serialize,
-    Deserialize,
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    JsonSchema,
-)]
-#[serde(crate = "near_sdk::serde")]
-pub enum Asset {
-    FungibleToken {
-        #[schemars(with = "String")]
-        contract_id: AccountId,
-    },
-    MultiToken {
-        #[schemars(with = "String")]
-        contract_id: AccountId,
-        token_id: String,
-    },
-}
-
 #[allow(unused)]
 pub trait VaultCore: FungibleTokenCore + FungibleTokenReceiver {
-    fn asset(&self) -> Asset;
+    fn asset(&self) -> AccountId;
     fn total_assets(&self) -> U128;
     fn redeem(
         &mut self,
