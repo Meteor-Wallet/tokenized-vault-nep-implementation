@@ -438,3 +438,54 @@ async fn test_multi_user_same_rates() -> Result<(), Box<dyn std::error::Error>> 
 
     Ok(())
 }
+
+/// Test that asset() function returns correct underlying asset and never reverts
+#[tokio::test]
+async fn test_asset_function_properties() -> Result<(), Box<dyn std::error::Error>> {
+    let worker = near_workspaces::sandbox().await?;
+    let owner = worker.dev_create_account().await?;
+
+    let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+
+    // asset() should never revert and always return the same value
+    let asset1 = vault_asset(&vault, &owner).await?;
+    let asset2 = vault_asset(&vault, &owner).await?;
+
+    assert_eq!(asset1, asset2);
+    assert_eq!(asset1, usdt.id().to_string());
+
+    Ok(())
+}
+
+/// Test that total_assets() never reverts
+#[tokio::test]
+async fn test_total_assets_never_reverts() -> Result<(), Box<dyn std::error::Error>> {
+    let worker = near_workspaces::sandbox().await?;
+    let owner = worker.dev_create_account().await?;
+    let alice = worker.dev_create_account().await?;
+
+    let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+
+    // Setup accounts
+    ft_storage_deposit(&usdt, &alice).await?;
+    vault_storage_deposit(&vault, &alice).await?;
+    ft_transfer(&usdt, &owner, &alice, 10000).await?;
+
+    // total_assets() should work at all times
+    let initial_assets = vault_total_assets(&vault, &alice).await?;
+    assert_eq!(initial_assets.0, 0);
+
+    // After deposit
+    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None).await?;
+    let after_deposit = vault_total_assets(&vault, &alice).await?;
+    assert_eq!(after_deposit.0, 1000);
+
+    // After partial withdrawal of 250 shares
+    vault_redeem(&vault, &alice, 250, None, None).await?;
+    let after_withdraw = vault_total_assets(&vault, &alice).await?;
+    assert_eq!(after_withdraw.0, 750, "Should have 750 assets remaining after redeeming 250 shares from 1000");
+
+    Ok(())
+}
