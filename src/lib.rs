@@ -211,13 +211,12 @@ impl FungibleTokenReceiver for ERC4626Vault {
 
         let max_new_shares = self.convert_to_shares(amount).0;
 
+        // Check slippage protection - if min_shares requirement can't be met, reject the deposit
         if let Some(min_shares) = parsed_msg.min_shares {
-            assert!(
-                max_new_shares >= min_shares.0,
-                "Slippage error, insufficient shares minted: {} < {}",
-                max_new_shares,
-                min_shares.0
-            );
+            if max_new_shares < min_shares.0 {
+                // Return all amount as unused (reject the entire deposit)
+                return PromiseOrValue::Value(amount);
+            }
         }
 
         let shares = if let Some(max_shares) = parsed_msg.max_shares {
@@ -243,10 +242,9 @@ impl FungibleTokenReceiver for ERC4626Vault {
             amount.0
         );
 
-        self.token.internal_deposit(&sender_id, shares);
-        self.total_assets += used_amount;
-
         let owner_id = parsed_msg.receiver_id.unwrap_or(sender_id.clone());
+        self.token.internal_deposit(&owner_id, shares);
+        self.total_assets += used_amount;
 
         FtMint {
             owner_id: &owner_id,
@@ -259,7 +257,7 @@ impl FungibleTokenReceiver for ERC4626Vault {
         VaultDeposit {
             sender_id: &sender_id,
             owner_id: &owner_id,
-            assets: amount,
+            assets: U128(used_amount),
             shares: U128(shares),
             memo: parsed_msg.memo.as_deref(),
         }

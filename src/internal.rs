@@ -86,6 +86,11 @@ impl ERC4626Vault {
     pub fn internal_convert_to_shares(&self, assets: u128, rounding: Rounding) -> u128 {
         let total_supply = self.token.ft_total_supply().0;
 
+        // Handle empty vault case - return 1:1 ratio for first deposit
+        if total_supply == 0 {
+            return assets;
+        }
+
         let supply_adj = total_supply;
         let assets_adj = self.total_assets + 1;
 
@@ -95,8 +100,9 @@ impl ERC4626Vault {
     pub fn internal_convert_to_assets(&self, shares: u128, rounding: Rounding) -> u128 {
         let total_supply = self.token.ft_total_supply().0;
 
+        // For empty vault, assume 1:1 ratio for consistency
         if total_supply == 0 {
-            return 0; // No assets when no shares exist
+            return shares;
         }
 
         let supply_adj = total_supply;
