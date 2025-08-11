@@ -30,6 +30,7 @@ const GAS_FOR_FT_TRANSFER: Gas = Gas::from_tgas(30);
 pub struct DepositMessage {
     min_shares: Option<U128>,
     max_shares: Option<U128>,
+    receiver_id: Option<AccountId>,
     memo: Option<String>,
 }
 
@@ -203,6 +204,7 @@ impl FungibleTokenReceiver for ERC4626Vault {
             Err(_) => DepositMessage {
                 min_shares: None,
                 max_shares: None,
+                receiver_id: None,
                 memo: None,
             },
         };
@@ -244,8 +246,10 @@ impl FungibleTokenReceiver for ERC4626Vault {
         self.token.internal_deposit(&sender_id, shares);
         self.total_assets += used_amount;
 
+        let owner_id = parsed_msg.receiver_id.unwrap_or(sender_id.clone());
+
         FtMint {
-            owner_id: &sender_id,
+            owner_id: &owner_id,
             amount: U128(shares),
             memo: Some("Deposit"),
         }
@@ -254,7 +258,7 @@ impl FungibleTokenReceiver for ERC4626Vault {
         // Emit VaultDeposit event
         VaultDeposit {
             sender_id: &sender_id,
-            owner_id: &sender_id,
+            owner_id: &owner_id,
             assets: amount,
             shares: U128(shares),
             memo: parsed_msg.memo.as_deref(),
