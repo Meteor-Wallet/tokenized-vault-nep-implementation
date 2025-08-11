@@ -5,6 +5,7 @@ use near_sdk::{
     serde::{Deserialize, Serialize},
     AccountId, PromiseOrValue,
 };
+use schemars::JsonSchema;
 use uint::construct_uint;
 
 pub mod events;
@@ -13,13 +14,25 @@ construct_uint! {
     pub struct U256(4);
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(
+    BorshSerialize,
+    BorshDeserialize,
+    Serialize,
+    Deserialize,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    JsonSchema,
+)]
 #[serde(crate = "near_sdk::serde")]
 pub enum Asset {
     FungibleToken {
+        #[schemars(with = "String")]
         contract_id: AccountId,
     },
     MultiToken {
+        #[schemars(with = "String")]
         contract_id: AccountId,
         token_id: String,
     },
