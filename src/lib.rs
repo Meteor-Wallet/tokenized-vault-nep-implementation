@@ -198,7 +198,7 @@ impl FungibleTokenReceiver for ERC4626Vault {
             self.asset.clone(),
             "Only the underlying asset can be deposited"
         );
-        
+
         let parsed_msg = match serde_json::from_str::<DepositMessage>(&msg) {
             Ok(deposit_message) => deposit_message,
             Err(_) => DepositMessage {

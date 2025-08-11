@@ -1,7 +1,7 @@
+use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_sdk::{json_types::U128, NearToken};
 use near_workspaces::{Account, Contract};
 use serde_json::json;
-use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 
 pub async fn deploy_and_init_vault(
     owner: &Account,
@@ -10,9 +10,15 @@ pub async fn deploy_and_init_vault(
     vault_symbol: &str,
 ) -> Result<Contract, Box<dyn std::error::Error>> {
     let contract_code = near_workspaces::compile_project("./").await?;
-    
+
     // Create a unique account for each vault deployment with sufficient balance
-    let vault_id = format!("v{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+    let vault_id = format!(
+        "v{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    );
     let vault_account = owner
         .create_subaccount(&vault_id)
         .initial_balance(near_workspaces::types::NearToken::from_near(10))
@@ -84,13 +90,18 @@ pub async fn ft_transfer_call_deposit(
     max_shares: Option<u128>,
     memo: Option<&str>,
 ) -> Result<U128, Box<dyn std::error::Error>> {
-    let msg = if receiver_id.is_some() || min_shares.is_some() || max_shares.is_some() || memo.is_some() {
+    let msg = if receiver_id.is_some()
+        || min_shares.is_some()
+        || max_shares.is_some()
+        || memo.is_some()
+    {
         json!({
             "receiver_id": receiver_id.map(|acc| acc.id()),
             "min_shares": min_shares.map(|s| s.to_string()),
             "max_shares": max_shares.map(|s| s.to_string()),
             "memo": memo,
-        }).to_string()
+        })
+        .to_string()
     } else {
         "{}".to_string()
     };
@@ -211,10 +222,7 @@ pub async fn vault_asset(
     vault_contract: &Contract,
     account: &Account,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    let result: String = account
-        .view(vault_contract.id(), "asset")
-        .await?
-        .json()?;
+    let result: String = account.view(vault_contract.id(), "asset").await?.json()?;
     Ok(result)
 }
 
@@ -241,4 +249,3 @@ pub async fn vault_total_supply(
         .json()?;
     Ok(result)
 }
-

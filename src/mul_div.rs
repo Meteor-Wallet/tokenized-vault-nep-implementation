@@ -6,7 +6,7 @@ pub enum Rounding {
 
 pub fn mul_div(x: u128, y: u128, denominator: u128, rounding: Rounding) -> u128 {
     use crate::contract_standards::U256;
-    
+
     let numerator = U256::from(x) * U256::from(y);
     let denominator = U256::from(denominator);
     let result = numerator / denominator;

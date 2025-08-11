@@ -1,10 +1,9 @@
 use crate::helper::{
     mock_ft::{deploy_and_init_mock_ft, ft_balance_of, ft_storage_deposit, ft_transfer},
     vault::{
-        deploy_and_init_vault, vault_storage_deposit, ft_transfer_call_deposit,
-        vault_redeem, vault_withdraw, vault_total_assets, vault_convert_to_shares,
-        vault_convert_to_assets, vault_preview_withdraw, vault_asset,
-        vault_balance_of, vault_total_supply,
+        deploy_and_init_vault, ft_transfer_call_deposit, vault_asset, vault_balance_of,
+        vault_convert_to_assets, vault_convert_to_shares, vault_preview_withdraw, vault_redeem,
+        vault_storage_deposit, vault_total_assets, vault_total_supply, vault_withdraw,
     },
 };
 
@@ -15,7 +14,7 @@ mod helper;
 async fn test_vault_initialization() -> Result<(), Box<dyn std::error::Error>> {
     let worker = near_workspaces::sandbox().await?;
     let owner = worker.dev_create_account().await?;
-    
+
     let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
     let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
 
@@ -40,7 +39,7 @@ async fn test_deposit_functionality() -> Result<(), Box<dyn std::error::Error>> 
     let worker = near_workspaces::sandbox().await?;
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
-    
+
     let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
     let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
 
@@ -52,8 +51,16 @@ async fn test_deposit_functionality() -> Result<(), Box<dyn std::error::Error>> 
     // Test deposit
     let deposit_amount = 1000u128;
     let result = ft_transfer_call_deposit(
-        &usdt, &vault, &alice, deposit_amount, None, None, None, None
-    ).await?;
+        &usdt,
+        &vault,
+        &alice,
+        deposit_amount,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await?;
 
     // Verify result is 1000 (used amount) - ft_resolve_transfer returns used amount
     assert_eq!(result.0, 1000);
@@ -77,7 +84,7 @@ async fn test_conversion_functions() -> Result<(), Box<dyn std::error::Error>> {
     let worker = near_workspaces::sandbox().await?;
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
-    
+
     let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
     let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
 
@@ -89,8 +96,16 @@ async fn test_conversion_functions() -> Result<(), Box<dyn std::error::Error>> {
     // Initial deposit
     let deposit_amount = 1000u128;
     ft_transfer_call_deposit(
-        &usdt, &vault, &alice, deposit_amount, None, None, None, None
-    ).await?;
+        &usdt,
+        &vault,
+        &alice,
+        deposit_amount,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await?;
 
     // Test conversion functions with 1:1 ratio (adjusted for inflation resistance)
     let shares_for_500_assets = vault_convert_to_shares(&vault, &alice, 500).await?;
@@ -108,7 +123,7 @@ async fn test_redeem_functionality() -> Result<(), Box<dyn std::error::Error>> {
     let worker = near_workspaces::sandbox().await?;
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
-    
+
     let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
     let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
 
@@ -120,8 +135,16 @@ async fn test_redeem_functionality() -> Result<(), Box<dyn std::error::Error>> {
     // Initial deposit
     let deposit_amount = 1000u128;
     ft_transfer_call_deposit(
-        &usdt, &vault, &alice, deposit_amount, None, None, None, None
-    ).await?;
+        &usdt,
+        &vault,
+        &alice,
+        deposit_amount,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await?;
 
     let initial_alice_ft_balance = ft_balance_of(&usdt, &alice).await?;
     let initial_alice_shares = vault_balance_of(&vault, &alice, &alice).await?.0;
@@ -156,7 +179,7 @@ async fn test_withdraw_functionality() -> Result<(), Box<dyn std::error::Error>>
     let worker = near_workspaces::sandbox().await?;
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
-    
+
     let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
     let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
 
@@ -168,8 +191,16 @@ async fn test_withdraw_functionality() -> Result<(), Box<dyn std::error::Error>>
     // Initial deposit
     let deposit_amount = 1000u128;
     ft_transfer_call_deposit(
-        &usdt, &vault, &alice, deposit_amount, None, None, None, None
-    ).await?;
+        &usdt,
+        &vault,
+        &alice,
+        deposit_amount,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await?;
 
     let initial_alice_ft_balance = ft_balance_of(&usdt, &alice).await?;
     let initial_alice_shares = vault_balance_of(&vault, &alice, &alice).await?.0;
@@ -204,7 +235,7 @@ async fn test_preview_withdraw() -> Result<(), Box<dyn std::error::Error>> {
     let worker = near_workspaces::sandbox().await?;
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
-    
+
     let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
     let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
 
@@ -216,8 +247,16 @@ async fn test_preview_withdraw() -> Result<(), Box<dyn std::error::Error>> {
     // Initial deposit
     let deposit_amount = 1000u128;
     ft_transfer_call_deposit(
-        &usdt, &vault, &alice, deposit_amount, None, None, None, None
-    ).await?;
+        &usdt,
+        &vault,
+        &alice,
+        deposit_amount,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await?;
 
     // Test preview_withdraw
     let preview_shares = vault_preview_withdraw(&vault, &alice, 500).await?;
@@ -238,7 +277,7 @@ async fn test_deposit_with_receiver() -> Result<(), Box<dyn std::error::Error>> 
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
     let bob = worker.dev_create_account().await?;
-    
+
     let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
     let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
 
@@ -251,8 +290,16 @@ async fn test_deposit_with_receiver() -> Result<(), Box<dyn std::error::Error>> 
     // Alice deposits but shares go to Bob
     let deposit_amount = 1000u128;
     ft_transfer_call_deposit(
-        &usdt, &vault, &alice, deposit_amount, Some(&bob), None, None, None
-    ).await?;
+        &usdt,
+        &vault,
+        &alice,
+        deposit_amount,
+        Some(&bob),
+        None,
+        None,
+        None,
+    )
+    .await?;
 
     // Verify alice has no shares
     let alice_shares = vault_balance_of(&vault, &alice, &alice).await?;
@@ -271,7 +318,7 @@ async fn test_deposit_with_slippage_protection() -> Result<(), Box<dyn std::erro
     let worker = near_workspaces::sandbox().await?;
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
-    
+
     let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
     let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
 
@@ -284,8 +331,16 @@ async fn test_deposit_with_slippage_protection() -> Result<(), Box<dyn std::erro
     let deposit_amount = 1000u128;
     let min_shares = 900u128;
     ft_transfer_call_deposit(
-        &usdt, &vault, &alice, deposit_amount, None, Some(min_shares), None, None
-    ).await?;
+        &usdt,
+        &vault,
+        &alice,
+        deposit_amount,
+        None,
+        Some(min_shares),
+        None,
+        None,
+    )
+    .await?;
 
     let alice_shares = vault_balance_of(&vault, &alice, &alice).await?;
     assert_eq!(alice_shares.0, deposit_amount);
@@ -312,8 +367,16 @@ async fn test_deposit_max_shares_with_refund() -> Result<(), Box<dyn std::error:
     let deposit_amount = 1000u128;
     let max_shares = 500u128;
     let result = ft_transfer_call_deposit(
-        &usdt, &vault, &alice, deposit_amount, None, None, Some(max_shares), None
-    ).await?;
+        &usdt,
+        &vault,
+        &alice,
+        deposit_amount,
+        None,
+        None,
+        Some(max_shares),
+        None,
+    )
+    .await?;
 
     // Only 500 shares minted, so only 500 USDT used, 500 refunded
     assert_eq!(result.0, 500);
@@ -341,7 +404,7 @@ async fn test_multi_user_same_rates() -> Result<(), Box<dyn std::error::Error>> 
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
     let bob = worker.dev_create_account().await?;
-    
+
     let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
     let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
 
@@ -361,7 +424,7 @@ async fn test_multi_user_same_rates() -> Result<(), Box<dyn std::error::Error>> 
 
     let alice_shares = vault_balance_of(&vault, &alice, &alice).await?;
     let bob_shares = vault_balance_of(&vault, &alice, &bob).await?;
-    
+
     assert_eq!(alice_shares.0, 1000);
     assert_eq!(bob_shares.0, 999); // Due to inflation resistance adjustment
 
