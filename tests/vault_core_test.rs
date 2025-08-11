@@ -485,7 +485,10 @@ async fn test_total_assets_never_reverts() -> Result<(), Box<dyn std::error::Err
     // After partial withdrawal of 250 shares
     vault_redeem(&vault, &alice, 250, None, None).await?;
     let after_withdraw = vault_total_assets(&vault, &alice).await?;
-    assert_eq!(after_withdraw.0, 750, "Should have 750 assets remaining after redeeming 250 shares from 1000");
+    assert_eq!(
+        after_withdraw.0, 750,
+        "Should have 750 assets remaining after redeeming 250 shares from 1000"
+    );
 
     Ok(())
 }

@@ -547,8 +547,8 @@ async fn test_unauthorized_asset_transfer() -> Result<(), Box<dyn std::error::Er
     let error_message = format!("{:?}", result.unwrap_err());
     // The error could be about unregistered account or unauthorized token
     assert!(
-        error_message.contains("Only the underlying asset can be deposited") ||
-        error_message.contains("is not registered"),
+        error_message.contains("Only the underlying asset can be deposited")
+            || error_message.contains("is not registered"),
         "Should contain either unauthorized token or unregistered account error, got: {}",
         error_message
     );
