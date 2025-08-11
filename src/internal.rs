@@ -186,7 +186,7 @@ impl ERC4626Vault {
 
             vec![U128(0)] // Accept all tokens
         } else {
-            amounts // Reject all tokens if not MT asset
+            panic!("Only the underlying asset can be deposited") // Reject all tokens if not MT asset
         }
     }
 }

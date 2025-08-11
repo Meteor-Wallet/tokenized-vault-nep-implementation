@@ -140,6 +140,7 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         assert_one_yocto();
 
         let owner = env::predecessor_account_id();
+
         assert!(
             shares.0 <= self.max_redeem(owner.clone()).0,
             "Exceeds max redeem"
@@ -242,7 +243,7 @@ impl FungibleTokenReceiver for ERC4626Vault {
 
             PromiseOrValue::Value(U128(0)) // Accept all tokens
         } else {
-            PromiseOrValue::Value(amount) // Reject all tokens if not FT asset
+            panic!("Only the underlying asset can be deposited") // Reject all tokens if not FT asset
         }
     }
 }
