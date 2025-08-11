@@ -95,7 +95,7 @@ impl ERC4626Vault {
                 // Restore total_assets that was reduced
                 self.total_assets += assets.0;
 
-                env::panic_str("Asset transfer failed - state rolled back")
+                0.into()
             }
         }
     }
