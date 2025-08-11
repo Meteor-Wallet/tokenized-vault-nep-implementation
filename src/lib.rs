@@ -125,6 +125,11 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         assert_one_yocto();
 
         let owner = env::predecessor_account_id();
+        assert!(
+            shares.0 <= self.max_redeem(owner.clone()).0,
+            "Exceeds max redeem"
+        );
+
         let assets = self.convert_to_assets_internal(shares.0, Rounding::Down);
 
         PromiseOrValue::Promise(self.internal_execute_withdrawal(
@@ -146,6 +151,11 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         assert_one_yocto();
 
         let owner = env::predecessor_account_id();
+        assert!(
+            assets.0 <= self.max_withdraw(owner.clone()).0,
+            "Exceeds max withdraw"
+        );
+
         let shares = self.convert_to_shares_internal(assets.0, Rounding::Up);
 
         PromiseOrValue::Promise(self.internal_execute_withdrawal(
