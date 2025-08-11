@@ -21,11 +21,11 @@ use near_sdk::{
 use near_sdk::{env, near_bindgen, AccountId, Gas, NearToken, PanicOnDefault, PromiseOrValue};
 use near_sdk::{json_types::U128, BorshStorageKey};
 
-use crate::asset_type::AssetType;
 use crate::contract_standards::events::{VaultDeposit, VaultWithdraw};
 use crate::contract_standards::VaultCore;
 use crate::mul_div::Rounding;
 use crate::multi_token::MultiTokenReceiver;
+use crate::{asset_type::AssetType, contract_standards::Asset};
 
 const GAS_FOR_FT_TRANSFER: Gas = Gas::from_tgas(30);
 
@@ -61,13 +61,6 @@ impl ERC4626Vault {
             total_assets: 0,
             owner: env::predecessor_account_id(),
         }
-    }
-
-    // TODO: Either the NEP spec needed to be changed, or the asset type needed to be changed
-    // A string can not represent the underlying asset if the asset is NEP-245
-    // Further edit after Edward makes decision
-    pub fn asset_type(&self) -> AssetType {
-        self.asset.clone()
     }
 
     #[private]
@@ -119,11 +112,17 @@ impl ERC4626Vault {
 // ===== Implement FungibleTokenVaultCore Trait =====
 #[near_bindgen]
 impl VaultCore for ERC4626Vault {
-    // TODO: Either the NEP spec needed to be changed, or the asset type needed to be changed
-    // A string can not represent the underlying asset if the asset is NEP-245
-    // Further edit after Edward makes decision
-    fn asset(&self) -> AccountId {
-        self.asset.contract_id().clone()
+    fn asset(&self) -> Asset {
+        match self.asset.clone() {
+            AssetType::FungibleToken { contract_id } => Asset::FungibleToken { contract_id },
+            AssetType::MultiToken {
+                contract_id,
+                token_id,
+            } => Asset::MultiToken {
+                contract_id,
+                token_id,
+            },
+        }
     }
 
     fn total_assets(&self) -> U128 {
