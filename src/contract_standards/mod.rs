@@ -1,3 +1,4 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use near_contract_standards::fungible_token::{receiver::FungibleTokenReceiver, FungibleTokenCore};
 use near_sdk::{
     json_types::U128,
@@ -12,7 +13,7 @@ construct_uint! {
     pub struct U256(4);
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(crate = "near_sdk::serde")]
 pub enum Asset {
     FungibleToken {
