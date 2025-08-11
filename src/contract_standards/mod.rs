@@ -52,12 +52,39 @@ pub trait FungibleTokenVaultCore: FungibleTokenCore + FungibleTokenReceiver {
     }
 
     fn max_deposit(&self, receiver_id: AccountId) -> U128 {
-        (u128::MAX - self.total_assets().0).into()
+        let max_assets = u128::MAX - self.total_assets().0;
+        let max_assets_from_shares = self
+            .convert_to_assets(U128(u128::MAX - self.ft_total_supply().0))
+            .0;
+
+        if max_assets < max_assets_from_shares {
+            max_assets.into()
+        } else {
+            max_assets_from_shares.into()
+        }
     }
 
     fn preview_deposit(&self, assets: U128) -> U128 {
         assert!(assets <= self.max_deposit(near_sdk::env::predecessor_account_id()));
         self.convert_to_shares(assets)
+    }
+
+    fn max_mint(&self, receiver_id: AccountId) -> U128 {
+        let max_shares = u128::MAX - self.ft_total_supply().0;
+        let max_shares_from_assets = self
+            .convert_to_shares(U128(u128::MAX - self.total_assets().0))
+            .0;
+
+        if max_shares < max_shares_from_assets {
+            max_shares.into()
+        } else {
+            max_shares_from_assets.into()
+        }
+    }
+
+    fn preview_mint(&self, shares: U128) -> U128 {
+        assert!(shares <= self.max_mint(near_sdk::env::predecessor_account_id()));
+        self.convert_to_assets(shares)
     }
 
     fn max_redeem(&self, owner_id: AccountId) -> U128 {
