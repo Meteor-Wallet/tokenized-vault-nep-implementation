@@ -8,7 +8,7 @@ use near_contract_standards::fungible_token::{
     core::FungibleTokenCore,
     core_impl::FungibleToken,
     events::FtMint,
-    metadata::{FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC},
+    metadata::{FungibleTokenMetadata, FungibleTokenMetadataProvider},
     receiver::FungibleTokenReceiver,
     FungibleTokenResolver,
 };
