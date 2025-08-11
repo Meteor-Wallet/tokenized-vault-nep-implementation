@@ -45,24 +45,10 @@ pub enum StorageKey {
 #[near_bindgen]
 impl ERC4626Vault {
     #[init]
-    pub fn new(
-        asset: AssetType,
-        name: String,
-        symbol: String,
-        decimals: u8,
-        icon: Option<String>,
-    ) -> Self {
+    pub fn new(asset: AssetType, metadata: FungibleTokenMetadata) -> Self {
         Self {
             token: FungibleToken::new(StorageKey::FungibleToken),
-            metadata: FungibleTokenMetadata {
-                spec: FT_METADATA_SPEC.to_string(),
-                name,
-                symbol,
-                icon,
-                reference: None,
-                reference_hash: None,
-                decimals,
-            },
+            metadata,
             asset,
             total_assets: 0,
             owner: env::predecessor_account_id(),
