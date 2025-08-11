@@ -198,7 +198,7 @@ impl FungibleTokenReceiver for ERC4626Vault {
             self.asset.clone(),
             "Only the underlying asset can be deposited"
         );
-
+        
         let parsed_msg = match serde_json::from_str::<DepositMessage>(&msg) {
             Ok(deposit_message) => deposit_message,
             Err(_) => DepositMessage {
@@ -243,10 +243,9 @@ impl FungibleTokenReceiver for ERC4626Vault {
             amount.0
         );
 
-        self.token.internal_deposit(&sender_id, shares);
-        self.total_assets += used_amount;
-
         let owner_id = parsed_msg.receiver_id.unwrap_or(sender_id.clone());
+        self.token.internal_deposit(&owner_id, shares);
+        self.total_assets += used_amount;
 
         FtMint {
             owner_id: &owner_id,
@@ -259,7 +258,7 @@ impl FungibleTokenReceiver for ERC4626Vault {
         VaultDeposit {
             sender_id: &sender_id,
             owner_id: &owner_id,
-            assets: amount,
+            assets: U128(used_amount),
             shares: U128(shares),
             memo: parsed_msg.memo.as_deref(),
         }
