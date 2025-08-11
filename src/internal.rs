@@ -1,4 +1,7 @@
-use near_contract_standards::fungible_token::FungibleTokenCore;
+use near_contract_standards::fungible_token::{
+    events::{FtBurn, FtMint},
+    FungibleTokenCore,
+};
 use near_sdk::{env, json_types::U128, AccountId, Gas, NearToken, Promise};
 
 use crate::{
@@ -89,6 +92,13 @@ impl ERC4626Vault {
         self.token.internal_withdraw(&owner, shares_to_burn);
         self.total_assets -= assets_to_transfer;
 
+        FtBurn {
+            owner_id: &owner,
+            amount: U128(shares_to_burn),
+            memo: Some("Withdrawal"),
+        }
+        .emit();
+
         // Interactions - External call
         self.internal_transfer_assets_with_callback(
             receiver_id,
@@ -151,6 +161,13 @@ impl ERC4626Vault {
             let shares = self.convert_to_shares_internal(amount.0, Rounding::Down);
             self.token.internal_deposit(&sender_id, shares);
             self.total_assets += amount.0;
+
+            FtMint {
+                owner_id: &sender_id,
+                amount: U128(shares),
+                memo: Some("Deposit"),
+            }
+            .emit();
 
             // Emit VaultDeposit event
             VaultDeposit {

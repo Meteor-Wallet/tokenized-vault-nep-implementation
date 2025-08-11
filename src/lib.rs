@@ -7,6 +7,7 @@ mod multi_token;
 use near_contract_standards::fungible_token::{
     core::FungibleTokenCore,
     core_impl::FungibleToken,
+    events::FtMint,
     metadata::{FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC},
     receiver::FungibleTokenReceiver,
     FungibleTokenResolver,
@@ -94,6 +95,13 @@ impl ERC4626Vault {
                 self.token.internal_deposit(&owner, shares.0);
                 // Restore total_assets that was reduced
                 self.total_assets += assets.0;
+
+                FtMint {
+                    owner_id: &owner,
+                    amount: U128(shares.0),
+                    memo: Some("Withdrawal rollback"),
+                }
+                .emit();
 
                 0.into()
             }
@@ -205,6 +213,13 @@ impl FungibleTokenReceiver for ERC4626Vault {
                 let shares = self.convert_to_shares(amount).0;
                 self.token.internal_deposit(&sender_id, shares);
                 self.total_assets += amount.0;
+
+                FtMint {
+                    owner_id: &sender_id,
+                    amount: U128(shares),
+                    memo: Some("Deposit"),
+                }
+                .emit();
 
                 // Emit VaultDeposit event
                 VaultDeposit {
