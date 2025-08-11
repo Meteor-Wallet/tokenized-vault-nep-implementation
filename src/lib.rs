@@ -1,29 +1,39 @@
 pub mod asset_type;
 mod contract_standards;
+mod internal;
 mod mul_div;
 mod multi_token;
 
 use near_contract_standards::fungible_token::{
     core::FungibleTokenCore,
     core_impl::FungibleToken,
-    metadata::{FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC},
+    events::FtMint,
+    metadata::{FungibleTokenMetadata, FungibleTokenMetadataProvider},
     receiver::FungibleTokenReceiver,
     FungibleTokenResolver,
 };
 use near_contract_standards::storage_management::StorageManagement;
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::U128;
 use near_sdk::{
-    env, near_bindgen, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue,
+    assert_one_yocto,
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    serde::Deserialize,
 };
+use near_sdk::{env, near_bindgen, AccountId, Gas, NearToken, PanicOnDefault, PromiseOrValue};
+use near_sdk::{json_types::U128, BorshStorageKey};
 
 use crate::asset_type::AssetType;
 use crate::contract_standards::events::{VaultDeposit, VaultWithdraw};
 use crate::contract_standards::FungibleTokenVaultCore;
-use crate::mul_div::{mul_div, Rounding};
+use crate::mul_div::Rounding;
 use crate::multi_token::MultiTokenReceiver;
 
 const GAS_FOR_FT_TRANSFER: Gas = Gas::from_tgas(30);
+
+#[derive(Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct DepositMessage {
+    memo: String,
+}
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -35,128 +45,29 @@ pub struct ERC4626Vault {
     owner: AccountId,                // Vault owner
 }
 
+#[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)]
+pub enum StorageKey {
+    FungibleToken,
+}
+
 #[near_bindgen]
 impl ERC4626Vault {
     #[init]
-    pub fn new(
-        asset: AssetType,
-        name: String,
-        symbol: String,
-        decimals: u8,
-        icon: Option<String>,
-    ) -> Self {
+    pub fn new(asset: AssetType, metadata: FungibleTokenMetadata) -> Self {
         Self {
-            token: FungibleToken::new(b"s"),
-            metadata: FungibleTokenMetadata {
-                spec: FT_METADATA_SPEC.to_string(),
-                name,
-                symbol,
-                icon,
-                reference: None,
-                reference_hash: None,
-                decimals,
-            },
+            token: FungibleToken::new(StorageKey::FungibleToken),
+            metadata,
             asset,
             total_assets: 0,
             owner: env::predecessor_account_id(),
         }
     }
 
-    // ===== View Functions =====
+    // TODO: Either the NEP spec needed to be changed, or the asset type needed to be changed
+    // A string can not represent the underlying asset if the asset is NEP-245
+    // Further edit after Edward makes decision
     pub fn asset_type(&self) -> AssetType {
         self.asset.clone()
-    }
-
-    // ===== Internal Helpers =====
-
-    fn internal_transfer_assets_with_callback(
-        &self,
-        receiver_id: AccountId,
-        amount: u128,
-        owner: AccountId,
-        shares: u128,
-        memo: Option<String>,
-    ) -> Promise {
-        let transfer_promise = match &self.asset {
-            AssetType::FungibleToken { contract_id } => {
-                Promise::new(contract_id.clone()).function_call(
-                    "ft_transfer".to_string(),
-                    format!(
-                        r#"{{"receiver_id": "{}", "amount": "{}"}}"#,
-                        receiver_id, amount
-                    )
-                    .into_bytes(),
-                    NearToken::from_yoctonear(1),
-                    GAS_FOR_FT_TRANSFER,
-                )
-            }
-            AssetType::MultiToken {
-                contract_id,
-                token_id,
-            } => {
-                Promise::new(contract_id.clone()).function_call(
-                    "mt_transfer".to_string(),
-                    format!(
-                        r#"{{"receiver_id": "{}", "token_id": "{}", "amount": "{}", "approval": null, "memo": null}}"#,
-                        receiver_id, token_id, amount
-                    )
-                    .into_bytes(),
-                    NearToken::from_yoctonear(1),
-                    GAS_FOR_FT_TRANSFER,
-                )
-            }
-        };
-
-        // Chain with callback to handle success/failure
-        transfer_promise.then(
-            Promise::new(env::current_account_id()).function_call(
-                "resolve_withdraw".to_string(),
-                format!(
-                    r#"{{"owner": "{}", "receiver": "{}", "shares": "{}", "assets": "{}", "memo": {}}}"#,
-                    owner, receiver_id, shares, amount,
-                    memo.as_ref().map(|m| format!("\"{}\"", m)).unwrap_or("null".to_string())
-                )
-                .into_bytes(),
-                NearToken::from_yoctonear(0),
-                Gas::from_tgas(10),
-            ),
-        )
-    }
-
-    fn internal_execute_withdrawal(
-        &mut self,
-        owner: AccountId,
-        receiver_id: Option<AccountId>,
-        shares_to_burn: u128,
-        assets_to_transfer: u128,
-        memo: Option<String>,
-    ) -> Promise {
-        let receiver_id = receiver_id.unwrap_or(owner.clone());
-
-        // Checks
-        assert!(
-            self.token.ft_balance_of(owner.clone()).0 >= shares_to_burn,
-            "Insufficient shares"
-        );
-        assert!(assets_to_transfer > 0, "No assets to withdraw");
-        assert!(
-            assets_to_transfer <= self.total_assets,
-            "Insufficient vault assets"
-        );
-
-        // Effects - CEI Pattern: Update state before external call
-        // Burn shares immediately (prevents reuse)
-        self.token.internal_withdraw(&owner, shares_to_burn);
-        self.total_assets -= assets_to_transfer;
-
-        // Interactions - External call
-        self.internal_transfer_assets_with_callback(
-            receiver_id,
-            assets_to_transfer,
-            owner,
-            shares_to_burn,
-            memo,
-        )
     }
 
     #[private]
@@ -192,83 +103,15 @@ impl ERC4626Vault {
                 // Restore total_assets that was reduced
                 self.total_assets += assets.0;
 
-                env::panic_str("Asset transfer failed - state rolled back")
-            }
-        }
-    }
-
-    fn convert_to_shares_internal(&self, assets: u128, rounding: Rounding) -> u128 {
-        let total_supply = self.token.ft_total_supply().0;
-
-        let supply_adj = total_supply;
-        let assets_adj = self.total_assets + 1;
-
-        mul_div(assets, supply_adj, assets_adj, rounding)
-    }
-
-    fn convert_to_assets_internal(&self, shares: u128, rounding: Rounding) -> u128 {
-        let total_supply = self.token.ft_total_supply().0;
-
-        if total_supply == 0 {
-            return 0; // No assets when no shares exist
-        }
-
-        let supply_adj = total_supply;
-        let assets_adj = self.total_assets + 1;
-
-        mul_div(shares, assets_adj, supply_adj, rounding)
-    }
-
-    // ===== Internal helper for MT deposits =====
-    /// Handle MT transfers to the vault
-    /// - If msg is "deposit": mint vault shares to sender
-    /// - Otherwise: just track assets without minting shares (for donations/yield additions)
-    fn handle_mt_deposit(
-        &mut self,
-        sender_id: AccountId,
-        token_ids: Vec<String>,
-        amounts: Vec<U128>,
-        msg: String,
-    ) -> Vec<U128> {
-        // Only accept if this is an MT asset
-        if let AssetType::MultiToken { token_id, .. } = &self.asset {
-            assert_eq!(
-                env::predecessor_account_id(),
-                *self.asset.contract_id(),
-                "Only the underlying asset can be deposited"
-            );
-
-            // Check that we're receiving the correct token
-            assert_eq!(token_ids.len(), 1, "Only single token transfers supported");
-            assert_eq!(amounts.len(), 1, "Only single token transfers supported");
-            assert_eq!(&token_ids[0], token_id, "Invalid token ID");
-
-            let amount = amounts[0];
-
-            // Check message to determine action
-            if msg == "deposit" {
-                // Deposit: mint shares to sender
-                let shares = self.convert_to_shares_internal(amount.0, Rounding::Down);
-                self.token.internal_deposit(&sender_id, shares);
-                self.total_assets += amount.0;
-
-                // Emit VaultDeposit event
-                VaultDeposit {
-                    sender_id: &sender_id,
-                    owner_id: &sender_id,
-                    assets: amount,
-                    shares: U128(shares),
-                    memo: None,
+                FtMint {
+                    owner_id: &owner,
+                    amount: U128(shares.0),
+                    memo: Some("Withdrawal rollback"),
                 }
                 .emit();
-            } else {
-                // Just track assets without minting shares
-                self.total_assets += amount.0;
-            }
 
-            vec![U128(0)] // Accept all tokens
-        } else {
-            amounts // Reject all tokens if not MT asset
+                0.into()
+            }
         }
     }
 }
@@ -276,6 +119,9 @@ impl ERC4626Vault {
 // ===== Implement FungibleTokenVaultCore Trait =====
 #[near_bindgen]
 impl FungibleTokenVaultCore for ERC4626Vault {
+    // TODO: Either the NEP spec needed to be changed, or the asset type needed to be changed
+    // A string can not represent the underlying asset if the asset is NEP-245
+    // Further edit after Edward makes decision
     fn asset(&self) -> AccountId {
         self.asset.contract_id().clone()
     }
@@ -284,14 +130,23 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         U128(self.total_assets)
     }
 
+    #[payable]
     fn redeem(
         &mut self,
         shares: U128,
         receiver_id: Option<AccountId>,
         memo: Option<String>,
     ) -> PromiseOrValue<U128> {
+        assert_one_yocto();
+
         let owner = env::predecessor_account_id();
-        let assets = self.convert_to_assets_internal(shares.0, Rounding::Down);
+
+        assert!(
+            shares.0 <= self.max_redeem(owner.clone()).0,
+            "Exceeds max redeem"
+        );
+
+        let assets = self.internal_convert_to_assets(shares.0, Rounding::Down);
 
         PromiseOrValue::Promise(self.internal_execute_withdrawal(
             owner,
@@ -302,14 +157,22 @@ impl FungibleTokenVaultCore for ERC4626Vault {
         ))
     }
 
+    #[payable]
     fn withdraw(
         &mut self,
         assets: U128,
         receiver_id: Option<AccountId>,
         memo: Option<String>,
     ) -> PromiseOrValue<U128> {
+        assert_one_yocto();
+
         let owner = env::predecessor_account_id();
-        let shares = self.convert_to_shares_internal(assets.0, Rounding::Up);
+        assert!(
+            assets.0 <= self.max_withdraw(owner.clone()).0,
+            "Exceeds max withdraw"
+        );
+
+        let shares = self.internal_convert_to_shares(assets.0, Rounding::Up);
 
         PromiseOrValue::Promise(self.internal_execute_withdrawal(
             owner,
@@ -321,35 +184,15 @@ impl FungibleTokenVaultCore for ERC4626Vault {
     }
 
     fn convert_to_shares(&self, assets: U128) -> U128 {
-        U128(self.convert_to_shares_internal(assets.0, Rounding::Down))
+        U128(self.internal_convert_to_shares(assets.0, Rounding::Down))
     }
 
     fn convert_to_assets(&self, shares: U128) -> U128 {
-        U128(self.convert_to_assets_internal(shares.0, Rounding::Down))
-    }
-
-    fn max_deposit(&self, receiver_id: AccountId) -> U128 {
-        U128(u128::MAX - self.total_assets)
-    }
-
-    fn preview_deposit(&self, assets: U128) -> U128 {
-        self.convert_to_shares(assets)
-    }
-
-    fn max_redeem(&self, owner_id: AccountId) -> U128 {
-        self.token.ft_balance_of(owner_id)
-    }
-
-    fn preview_redeem(&self, shares: U128) -> U128 {
-        self.convert_to_assets(shares)
-    }
-
-    fn max_withdraw(&self, owner: AccountId) -> U128 {
-        U128(self.convert_to_shares_internal(self.token.ft_balance_of(owner).0, Rounding::Down))
+        U128(self.internal_convert_to_assets(shares.0, Rounding::Down))
     }
 
     fn preview_withdraw(&self, assets: U128) -> U128 {
-        U128(self.convert_to_shares_internal(assets.0, Rounding::Up))
+        U128(self.internal_convert_to_shares(assets.0, Rounding::Up))
     }
 }
 
@@ -372,30 +215,35 @@ impl FungibleTokenReceiver for ERC4626Vault {
                 "Only the underlying asset can be deposited"
             );
 
-            // Check message to determine action
-            if msg == "deposit" {
-                // Deposit: mint shares to sender
-                let shares = self.convert_to_shares(amount).0;
-                self.token.internal_deposit(&sender_id, shares);
-                self.total_assets += amount.0;
+            let memo = match serde_json::from_str::<DepositMessage>(&msg) {
+                Ok(deposit_message) => Some(deposit_message.memo),
+                Err(_) => None,
+            };
 
-                // Emit VaultDeposit event
-                VaultDeposit {
-                    sender_id: &sender_id,
-                    owner_id: &sender_id,
-                    assets: amount,
-                    shares: U128(shares),
-                    memo: None,
-                }
-                .emit();
-            } else {
-                // Just track assets without minting shares
-                self.total_assets += amount.0;
+            let shares = self.convert_to_shares(amount).0;
+            self.token.internal_deposit(&sender_id, shares);
+            self.total_assets += amount.0;
+
+            FtMint {
+                owner_id: &sender_id,
+                amount: U128(shares),
+                memo: Some("Deposit"),
             }
+            .emit();
+
+            // Emit VaultDeposit event
+            VaultDeposit {
+                sender_id: &sender_id,
+                owner_id: &sender_id,
+                assets: amount,
+                shares: U128(shares),
+                memo: memo.as_deref(),
+            }
+            .emit();
 
             PromiseOrValue::Value(U128(0)) // Accept all tokens
         } else {
-            PromiseOrValue::Value(amount) // Reject all tokens if not FT asset
+            panic!("Only the underlying asset can be deposited") // Reject all tokens if not FT asset
         }
     }
 }
@@ -438,7 +286,7 @@ impl MultiTokenReceiver for ERC4626Vault {
         amounts: Vec<U128>,
         msg: String,
     ) -> Vec<U128> {
-        self.handle_mt_deposit(sender_id, token_ids, amounts, msg)
+        self.internal_handle_mt_deposit(sender_id, token_ids, amounts, msg)
     }
 }
 

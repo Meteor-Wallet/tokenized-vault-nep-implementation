@@ -1,6 +1,7 @@
 use near_sdk::json_types::U128;
 use near_sdk::AccountId;
-// use schemars::JsonSchema;
+
+#[allow(unused)]
 pub trait MultiTokenReceiver {
     /// Handle receiving tokens
     fn mt_on_transfer(
