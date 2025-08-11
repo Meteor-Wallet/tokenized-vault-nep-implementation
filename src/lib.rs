@@ -12,12 +12,12 @@ use near_contract_standards::fungible_token::{
     FungibleTokenResolver,
 };
 use near_contract_standards::storage_management::StorageManagement;
-use near_sdk::json_types::U128;
 use near_sdk::{
     assert_one_yocto,
     borsh::{self, BorshDeserialize, BorshSerialize},
 };
 use near_sdk::{env, near_bindgen, AccountId, Gas, NearToken, PanicOnDefault, PromiseOrValue};
+use near_sdk::{json_types::U128, BorshStorageKey};
 
 use crate::asset_type::AssetType;
 use crate::contract_standards::events::{VaultDeposit, VaultWithdraw};
@@ -37,6 +37,11 @@ pub struct ERC4626Vault {
     owner: AccountId,                // Vault owner
 }
 
+#[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)]
+pub enum StorageKey {
+    FungibleToken,
+}
+
 #[near_bindgen]
 impl ERC4626Vault {
     #[init]
@@ -48,7 +53,7 @@ impl ERC4626Vault {
         icon: Option<String>,
     ) -> Self {
         Self {
-            token: FungibleToken::new(b"s"),
+            token: FungibleToken::new(StorageKey::FungibleToken),
             metadata: FungibleTokenMetadata {
                 spec: FT_METADATA_SPEC.to_string(),
                 name,
