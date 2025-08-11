@@ -170,7 +170,7 @@ impl FungibleTokenVaultCore for ERC4626Vault {
     }
 
     fn max_deposit(&self, receiver_id: AccountId) -> U128 {
-        U128(u128::MAX - self.total_assets)
+        U128(u128::MAX - self.total_assets().0)
     }
 
     fn preview_deposit(&self, assets: U128) -> U128 {
