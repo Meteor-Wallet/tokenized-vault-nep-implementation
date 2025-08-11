@@ -219,33 +219,26 @@ impl FungibleTokenReceiver for ERC4626Vault {
                 Err(_) => None,
             };
 
-            // Check message to determine action
-            if msg == "deposit" {
-                // Deposit: mint shares to sender
-                let shares = self.convert_to_shares(amount).0;
-                self.token.internal_deposit(&sender_id, shares);
-                self.total_assets += amount.0;
+            let shares = self.convert_to_shares(amount).0;
+            self.token.internal_deposit(&sender_id, shares);
+            self.total_assets += amount.0;
 
-                FtMint {
-                    owner_id: &sender_id,
-                    amount: U128(shares),
-                    memo: Some("Deposit"),
-                }
-                .emit();
-
-                // Emit VaultDeposit event
-                VaultDeposit {
-                    sender_id: &sender_id,
-                    owner_id: &sender_id,
-                    assets: amount,
-                    shares: U128(shares),
-                    memo: memo.as_deref(),
-                }
-                .emit();
-            } else {
-                // Just track assets without minting shares
-                self.total_assets += amount.0;
+            FtMint {
+                owner_id: &sender_id,
+                amount: U128(shares),
+                memo: Some("Deposit"),
             }
+            .emit();
+
+            // Emit VaultDeposit event
+            VaultDeposit {
+                sender_id: &sender_id,
+                owner_id: &sender_id,
+                assets: amount,
+                shares: U128(shares),
+                memo: memo.as_deref(),
+            }
+            .emit();
 
             PromiseOrValue::Value(U128(0)) // Accept all tokens
         } else {
