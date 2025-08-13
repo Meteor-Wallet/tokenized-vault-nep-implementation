@@ -211,24 +211,24 @@ impl FungibleTokenReceiver for TokenizedVault {
             },
         };
 
-        let max_new_shares = self.convert_to_shares(amount).0;
+        let calculated_shares = self.convert_to_shares(amount).0;
 
         // Check slippage protection - if min_shares requirement can't be met, reject the deposit
         if let Some(min_shares) = parsed_msg.min_shares {
-            if max_new_shares < min_shares.0 {
+            if calculated_shares < min_shares.0 {
                 // Return all amount as unused (reject the entire deposit)
                 return PromiseOrValue::Value(amount);
             }
         }
 
         let shares = if let Some(max_shares) = parsed_msg.max_shares {
-            if max_new_shares > max_shares.0 {
+            if calculated_shares > max_shares.0 {
                 max_shares.0
             } else {
-                max_new_shares
+                calculated_shares
             }
         } else {
-            max_new_shares
+            calculated_shares
         };
 
         let used_amount = self.internal_convert_to_assets(shares, Rounding::Up);
