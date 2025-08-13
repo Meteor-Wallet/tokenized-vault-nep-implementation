@@ -93,7 +93,9 @@ impl TokenizedVault {
                 // Restore shares that were burned
                 self.token.internal_deposit(&owner, shares.0);
                 // Restore total_assets that was reduced
-                self.total_assets += assets.0;
+                self.total_assets = self.total_assets
+                    .checked_add(assets.0)
+                    .expect("total_assets overflow");
 
                 FtMint {
                     owner_id: &owner,
@@ -244,7 +246,10 @@ impl FungibleTokenReceiver for TokenizedVault {
 
         let owner_id = parsed_msg.receiver_id.unwrap_or(sender_id.clone());
         self.token.internal_deposit(&owner_id, shares);
-        self.total_assets += used_amount;
+        self.total_assets = self
+            .total_assets
+            .checked_add(used_amount)
+            .expect("total_assets overflow");
 
         FtMint {
             owner_id: &owner_id,
