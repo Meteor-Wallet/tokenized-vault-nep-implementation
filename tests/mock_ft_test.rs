@@ -12,7 +12,7 @@ async fn test_mock_ft_contract_is_working() -> Result<(), Box<dyn std::error::Er
     let alice = worker.dev_create_account().await?;
     let bob = worker.dev_create_account().await?;
 
-    let usdt = deploy_and_init_mock_ft(&trent, Some(100_000u128)).await?;
+    let usdt = deploy_and_init_mock_ft(&trent, "Tether USD", "USDT", Some(100_000u128)).await?;
 
     ft_storage_deposit(&usdt, &alice).await?;
     ft_storage_deposit(&usdt, &bob).await?;

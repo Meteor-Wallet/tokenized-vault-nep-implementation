@@ -89,9 +89,9 @@ impl TokenizedVault {
     pub fn internal_convert_to_shares(&self, assets: u128, rounding: Rounding) -> u128 {
         let total_supply = self.token.ft_total_supply().0;
 
-        // Handle empty vault case - return 1:1 ratio for first deposit
+        // Handle empty vault case - return 1:1 ratio with extra decimals for first deposit
         if total_supply == 0 {
-            return assets;
+            return assets * 10u128.pow(self.extra_decimals as u32);
         }
 
         let supply_adj = total_supply;
@@ -103,9 +103,9 @@ impl TokenizedVault {
     pub fn internal_convert_to_assets(&self, shares: u128, rounding: Rounding) -> u128 {
         let total_supply = self.token.ft_total_supply().0;
 
-        // For empty vault, assume 1:1 ratio for consistency
+        // For empty vault, assume 1:1 ratio with extra decimals for consistency
         if total_supply == 0 {
-            return shares;
+            return shares / 10u128.pow(self.extra_decimals as u32);
         }
 
         let supply_adj = total_supply;

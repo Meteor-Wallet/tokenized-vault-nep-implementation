@@ -8,6 +8,7 @@ pub async fn deploy_and_init_vault(
     asset_contract: &Contract,
     vault_name: &str,
     vault_symbol: &str,
+    extra_decimals: u8,
 ) -> Result<Contract, Box<dyn std::error::Error>> {
     let contract_code = near_workspaces::compile_project("./").await?;
 
@@ -34,7 +35,7 @@ pub async fn deploy_and_init_vault(
         icon: None,
         reference: None,
         reference_hash: None,
-        decimals: 24,
+        decimals: 6 + extra_decimals,
     };
 
     contract
@@ -42,6 +43,7 @@ pub async fn deploy_and_init_vault(
         .args_json(json!({
             "asset": asset_contract.id(),
             "metadata": metadata,
+            "extra_decimals": extra_decimals,
         }))
         .transact()
         .await?
@@ -89,17 +91,20 @@ pub async fn ft_transfer_call_deposit(
     min_shares: Option<u128>,
     max_shares: Option<u128>,
     memo: Option<&str>,
+    donate: Option<bool>,
 ) -> Result<U128, Box<dyn std::error::Error>> {
     let msg = if receiver_id.is_some()
         || min_shares.is_some()
         || max_shares.is_some()
         || memo.is_some()
+        || donate.is_some()
     {
         json!({
             "receiver_id": receiver_id.map(|acc| acc.id()),
             "min_shares": min_shares.map(|s| s.to_string()),
             "max_shares": max_shares.map(|s| s.to_string()),
             "memo": memo,
+            "donate": donate.unwrap_or(false),
         })
         .to_string()
     } else {

@@ -15,8 +15,8 @@ async fn test_empty_vault_behavior() -> Result<(), Box<dyn std::error::Error>> {
     let worker = near_workspaces::sandbox().await?;
     let owner = worker.dev_create_account().await?;
 
-    let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
-    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+    let usdt = deploy_and_init_mock_ft(&owner, "Tether USD", "USDT", Some(1_000_000u128)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT", 0).await?;
 
     // Test conversions on empty vault
     let shares_for_zero = vault_convert_to_shares(&vault, &owner, 0).await?;
@@ -39,8 +39,9 @@ async fn test_rounding_behavior() -> Result<(), Box<dyn std::error::Error>> {
     let alice = worker.dev_create_account().await?;
     let attacker = worker.dev_create_account().await?;
 
-    let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000_000u128)).await?;
-    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+    let usdt =
+        deploy_and_init_mock_ft(&owner, "Tether USD", "USDT", Some(1_000_000_000u128)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT", 0).await?;
 
     // Setup accounts
     ft_storage_deposit(&usdt, &alice).await?;
@@ -52,13 +53,13 @@ async fn test_rounding_behavior() -> Result<(), Box<dyn std::error::Error>> {
     ft_transfer(&usdt, &owner, &attacker, 100_000_000).await?;
 
     // Alice makes first deposit
-    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None).await?;
+    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None, None).await?;
 
     let alice_initial_shares = vault_balance_of(&vault, &alice, &alice).await?;
     assert_eq!(alice_initial_shares.0, 1000);
 
     // Attacker tries inflation attack by depositing small amount
-    ft_transfer_call_deposit(&usdt, &vault, &attacker, 1, None, None, None, None).await?;
+    ft_transfer_call_deposit(&usdt, &vault, &attacker, 1, None, None, None, None, None).await?;
 
     let attacker_shares = vault_balance_of(&vault, &alice, &attacker).await?;
     let total_supply = vault_total_supply(&vault, &alice).await?;
@@ -91,8 +92,8 @@ async fn test_large_amounts() -> Result<(), Box<dyn std::error::Error>> {
     let alice = worker.dev_create_account().await?;
 
     let large_supply = u128::MAX / 2; // Use large but not max value to avoid overflow
-    let usdt = deploy_and_init_mock_ft(&owner, Some(large_supply)).await?;
-    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+    let usdt = deploy_and_init_mock_ft(&owner, "Tether USD", "USDT", Some(large_supply)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT", 0).await?;
 
     // Setup accounts
     ft_storage_deposit(&usdt, &alice).await?;
@@ -101,7 +102,18 @@ async fn test_large_amounts() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test large deposit
     let large_deposit = 1_000_000_000_000u128;
-    ft_transfer_call_deposit(&usdt, &vault, &alice, large_deposit, None, None, None, None).await?;
+    ft_transfer_call_deposit(
+        &usdt,
+        &vault,
+        &alice,
+        large_deposit,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await?;
 
     let alice_shares = vault_balance_of(&vault, &alice, &alice).await?;
     assert_eq!(alice_shares.0, large_deposit);
@@ -125,8 +137,8 @@ async fn test_insufficient_balance_withdrawal() -> Result<(), Box<dyn std::error
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
 
-    let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
-    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+    let usdt = deploy_and_init_mock_ft(&owner, "Tether USD", "USDT", Some(1_000_000u128)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT", 0).await?;
 
     // Setup accounts
     ft_storage_deposit(&usdt, &alice).await?;
@@ -134,7 +146,7 @@ async fn test_insufficient_balance_withdrawal() -> Result<(), Box<dyn std::error
     ft_transfer(&usdt, &owner, &alice, 10000).await?;
 
     // Deposit
-    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None).await?;
+    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None, None).await?;
 
     // Try to withdraw more than available
     let result = vault_withdraw(&vault, &alice, 2000, None, None).await;
@@ -172,8 +184,8 @@ async fn test_zero_amount_operations() -> Result<(), Box<dyn std::error::Error>>
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
 
-    let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
-    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+    let usdt = deploy_and_init_mock_ft(&owner, "Tether USD", "USDT", Some(1_000_000u128)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT", 0).await?;
 
     // Setup accounts
     ft_storage_deposit(&usdt, &alice).await?;
@@ -181,7 +193,7 @@ async fn test_zero_amount_operations() -> Result<(), Box<dyn std::error::Error>>
     ft_transfer(&usdt, &owner, &alice, 10000).await?;
 
     // First make a normal deposit
-    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None).await?;
+    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None, None).await?;
 
     // Test zero conversions
     let zero_shares = vault_convert_to_shares(&vault, &alice, 0).await?;
@@ -208,8 +220,8 @@ async fn test_deposit_slippage_protection_failure() -> Result<(), Box<dyn std::e
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
 
-    let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
-    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+    let usdt = deploy_and_init_mock_ft(&owner, "Tether USD", "USDT", Some(1_000_000u128)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT", 0).await?;
 
     // Setup accounts
     ft_storage_deposit(&usdt, &alice).await?;
@@ -223,6 +235,7 @@ async fn test_deposit_slippage_protection_failure() -> Result<(), Box<dyn std::e
         &vault,
         &alice,
         normal_deposit,
+        None,
         None,
         None,
         None,
@@ -243,6 +256,7 @@ async fn test_deposit_slippage_protection_failure() -> Result<(), Box<dyn std::e
         Some(min_shares), // min_shares
         None,             // max_shares
         None,             // memo
+        None,             // donate
     )
     .await?;
 
@@ -286,8 +300,8 @@ async fn test_max_shares_capping() -> Result<(), Box<dyn std::error::Error>> {
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
 
-    let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
-    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+    let usdt = deploy_and_init_mock_ft(&owner, "Tether USD", "USDT", Some(1_000_000u128)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT", 0).await?;
 
     // Setup accounts
     ft_storage_deposit(&usdt, &alice).await?;
@@ -306,6 +320,7 @@ async fn test_max_shares_capping() -> Result<(), Box<dyn std::error::Error>> {
         None,
         None,
         Some(max_shares),
+        None,
         None,
     )
     .await?;
@@ -354,8 +369,8 @@ async fn test_dust_amounts() -> Result<(), Box<dyn std::error::Error>> {
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
 
-    let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
-    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+    let usdt = deploy_and_init_mock_ft(&owner, "Tether USD", "USDT", Some(1_000_000u128)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT", 0).await?;
 
     // Setup accounts
     ft_storage_deposit(&usdt, &alice).await?;
@@ -363,13 +378,22 @@ async fn test_dust_amounts() -> Result<(), Box<dyn std::error::Error>> {
     ft_transfer(&usdt, &owner, &alice, 10000).await?;
 
     // Make normal deposit first
-    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None).await?;
+    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None, None).await?;
 
     // Test very small deposit (dust) - with inflation resistance, might be rejected
     let dust_amount = 1u128;
-    let used_amount =
-        ft_transfer_call_deposit(&usdt, &vault, &alice, dust_amount, None, None, None, None)
-            .await?;
+    let used_amount = ft_transfer_call_deposit(
+        &usdt,
+        &vault,
+        &alice,
+        dust_amount,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await?;
 
     let alice_shares_after = vault_balance_of(&vault, &alice, &alice).await?;
     let total_supply_after = vault_total_supply(&vault, &alice).await?;
@@ -465,8 +489,8 @@ async fn test_deposit_withdraw_round_trip() -> Result<(), Box<dyn std::error::Er
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
 
-    let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
-    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+    let usdt = deploy_and_init_mock_ft(&owner, "Tether USD", "USDT", Some(1_000_000u128)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT", 0).await?;
 
     // Setup accounts
     ft_storage_deposit(&usdt, &alice).await?;
@@ -474,7 +498,7 @@ async fn test_deposit_withdraw_round_trip() -> Result<(), Box<dyn std::error::Er
     ft_transfer(&usdt, &owner, &alice, 10000).await?;
 
     // Initial deposit to establish exchange rate
-    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None).await?;
+    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None, None).await?;
 
     // Record balance before round trip
     let pre_round_trip_balance = ft_balance_of(&usdt, &alice).await?;
@@ -486,6 +510,7 @@ async fn test_deposit_withdraw_round_trip() -> Result<(), Box<dyn std::error::Er
         &vault,
         &alice,
         deposit_amount,
+        None,
         None,
         None,
         None,
@@ -526,9 +551,10 @@ async fn test_unauthorized_asset_transfer() -> Result<(), Box<dyn std::error::Er
     let alice = worker.dev_create_account().await?;
     let fake_owner = worker.dev_create_account().await?;
 
-    let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
-    let fake_token = deploy_and_init_mock_ft(&fake_owner, Some(1_000_000u128)).await?;
-    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+    let usdt = deploy_and_init_mock_ft(&owner, "Tether USD", "USDT", Some(1_000_000u128)).await?;
+    let fake_token =
+        deploy_and_init_mock_ft(&fake_owner, "Tether USD", "USDT", Some(1_000_000u128)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT", 0).await?;
 
     // Setup accounts
     ft_storage_deposit(&usdt, &alice).await?;
@@ -538,8 +564,18 @@ async fn test_unauthorized_asset_transfer() -> Result<(), Box<dyn std::error::Er
     ft_transfer(&fake_token, &fake_owner, &alice, 10000).await?;
 
     // Try to deposit wrong token - should fail
-    let result =
-        ft_transfer_call_deposit(&fake_token, &vault, &alice, 1000, None, None, None, None).await;
+    let result = ft_transfer_call_deposit(
+        &fake_token,
+        &vault,
+        &alice,
+        1000,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
     assert!(
         result.is_err(),
         "Should reject deposits from unauthorized token contracts"
@@ -563,8 +599,8 @@ async fn test_withdrawal_rollback_mechanism() -> Result<(), Box<dyn std::error::
     let owner = worker.dev_create_account().await?;
     let alice = worker.dev_create_account().await?;
 
-    let usdt = deploy_and_init_mock_ft(&owner, Some(1_000_000u128)).await?;
-    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT").await?;
+    let usdt = deploy_and_init_mock_ft(&owner, "Tether USD", "USDT", Some(1_000_000u128)).await?;
+    let vault = deploy_and_init_vault(&owner, &usdt, "USDT Vault", "vUSDT", 0).await?;
 
     // Setup accounts
     ft_storage_deposit(&usdt, &alice).await?;
@@ -572,7 +608,7 @@ async fn test_withdrawal_rollback_mechanism() -> Result<(), Box<dyn std::error::
     ft_transfer(&usdt, &owner, &alice, 10000).await?;
 
     // Initial deposit
-    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None).await?;
+    ft_transfer_call_deposit(&usdt, &vault, &alice, 1000, None, None, None, None, None).await?;
 
     let initial_shares = vault_balance_of(&vault, &alice, &alice).await?.0;
     let initial_total_assets = vault_total_assets(&vault, &alice).await?.0;
@@ -606,6 +642,79 @@ async fn test_withdrawal_rollback_mechanism() -> Result<(), Box<dyn std::error::
     assert_eq!(
         final_total_supply, initial_total_supply,
         "Total supply should be restored on rollback"
+    );
+
+    Ok(())
+}
+
+/// # Inflation (Donation) Attack on ERC-4626 Vaults
+#[tokio::test]
+async fn test_inflation_attack() -> Result<(), Box<dyn std::error::Error>> {
+    let worker = near_workspaces::sandbox().await?;
+
+    let trent = worker.dev_create_account().await?;
+    let alice = worker.dev_create_account().await?;
+    let mallory = worker.dev_create_account().await?;
+
+    // In real life, 10_000_000_000 USDT, with decimals 6, is 1e16 tokens
+    let usdt = deploy_and_init_mock_ft(&trent, "Tether USD", "USDT", Some(10u128.pow(16))).await?;
+
+    // Deploy vault with inflation resistance enabled
+    let vault = deploy_and_init_vault(&trent, &usdt, "USDT Vault", "vUSDT", 12).await?;
+
+    // Setup accounts
+    ft_storage_deposit(&usdt, &alice).await?;
+    ft_storage_deposit(&usdt, &mallory).await?;
+    // $ 0.01 USDT for Alice
+    ft_transfer(&usdt, &trent, &alice, 10u128.pow(4)).await?;
+    // $ 1 billion USDT for Mallory
+    ft_transfer(&usdt, &trent, &mallory, 10u128.pow(15)).await?;
+
+    vault_storage_deposit(&vault, &alice).await?;
+    vault_storage_deposit(&vault, &mallory).await?;
+
+    // Attack begins here
+    // Mallory mint the minimum shares possible
+    ft_transfer_call_deposit(&usdt, &vault, &mallory, 1, None, None, None, None, None).await?;
+
+    // Mallory donate remaining assets to the vault, trying to make assets per share higher
+    let mallory_remaining_ft_balance = ft_balance_of(&usdt, &mallory).await?;
+    ft_transfer_call_deposit(
+        &usdt,
+        &vault,
+        &mallory,
+        mallory_remaining_ft_balance,
+        None,
+        None,
+        None,
+        None,
+        Some(true), // Donate
+    )
+    .await?;
+
+    // Alice now deposits her $0.01 USDT
+    ft_transfer_call_deposit(
+        &usdt,
+        &vault,
+        &alice,
+        10u128.pow(4),
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await?;
+
+    // Alice now withdraw her assets
+    let alice_shares = vault_balance_of(&vault, &alice, &alice).await?;
+    vault_redeem(&vault, &alice, alice_shares.0, None, None).await?;
+
+    // Alice balance
+    let alice_usdt_balance = ft_balance_of(&usdt, &alice).await?;
+    assert!(
+        alice_usdt_balance >= 10u128.pow(4) - 1,
+        "Alice should not lose more than 1 least significant digit after the withdrawal"
     );
 
     Ok(())

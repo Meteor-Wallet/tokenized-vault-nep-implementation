@@ -1,20 +1,34 @@
+use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_sdk::{json_types::U128, NearToken};
 use near_workspaces::{Account, Contract};
 use serde_json::json;
 
 pub async fn deploy_and_init_mock_ft(
     owner: &Account,
+    ft_name: &str,
+    ft_symbol: &str,
     total_supply: Option<u128>,
 ) -> Result<Contract, Box<dyn std::error::Error>> {
     let contract_code = near_workspaces::compile_project("./mock_contracts/mock_ft").await?;
 
     let contract = owner.deploy(&contract_code).await?.into_result()?;
 
+    let metadata = FungibleTokenMetadata {
+        spec: "ft-1.0.0".to_string(),
+        name: ft_name.to_string(),
+        symbol: ft_symbol.to_string(),
+        icon: None,
+        reference: None,
+        reference_hash: None,
+        decimals: 6,
+    };
+
     contract
-        .call("new_default_meta")
+        .call("new")
         .args_json(json!({
             "owner_id": owner.id(),
             "total_supply": total_supply.unwrap_or(u128::MAX).to_string(),
+            "metadata": metadata,
         }))
         .transact()
         .await?

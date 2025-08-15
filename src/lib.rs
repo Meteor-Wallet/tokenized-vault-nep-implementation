@@ -32,6 +32,7 @@ pub struct DepositMessage {
     max_shares: Option<U128>,
     receiver_id: Option<AccountId>,
     memo: Option<String>,
+    donate: Option<bool>,
 }
 
 #[near_bindgen]
@@ -42,6 +43,7 @@ pub struct TokenizedVault {
     asset: AccountId,                // Underlying asset (NEP-141 or NEP-245)
     total_assets: u128,              // Total managed assets
     owner: AccountId,                // Vault owner
+    extra_decimals: u8,              // Extra decimals for shares (if any)
 }
 
 #[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)]
@@ -52,13 +54,14 @@ pub enum StorageKey {
 #[near_bindgen]
 impl TokenizedVault {
     #[init]
-    pub fn new(asset: AccountId, metadata: FungibleTokenMetadata) -> Self {
+    pub fn new(asset: AccountId, metadata: FungibleTokenMetadata, extra_decimals: u8) -> Self {
         Self {
             token: FungibleToken::new(StorageKey::FungibleToken),
             metadata,
             asset,
             total_assets: 0,
             owner: env::predecessor_account_id(),
+            extra_decimals,
         }
     }
 
@@ -93,7 +96,8 @@ impl TokenizedVault {
                 // Restore shares that were burned
                 self.token.internal_deposit(&owner, shares.0);
                 // Restore total_assets that was reduced
-                self.total_assets = self.total_assets
+                self.total_assets = self
+                    .total_assets
                     .checked_add(assets.0)
                     .expect("total_assets overflow");
 
@@ -208,8 +212,18 @@ impl FungibleTokenReceiver for TokenizedVault {
                 max_shares: None,
                 receiver_id: None,
                 memo: None,
+                donate: Some(false),
             },
         };
+
+        if parsed_msg.donate.unwrap_or(false) {
+            self.total_assets = self
+                .total_assets
+                .checked_add(amount.0)
+                .expect("total_assets overflow");
+
+            return PromiseOrValue::Value(0.into());
+        }
 
         let calculated_shares = self.convert_to_shares(amount).0;
 
