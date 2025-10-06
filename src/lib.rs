@@ -205,16 +205,10 @@ impl FungibleTokenReceiver for TokenizedVault {
             "Only the underlying asset can be deposited"
         );
 
-        let parsed_msg = match serde_json::from_str::<DepositMessage>(&msg) {
-            Ok(deposit_message) => deposit_message,
-            Err(_) => DepositMessage {
-                min_shares: None,
-                max_shares: None,
-                receiver_id: None,
-                memo: None,
-                donate: Some(false),
-            },
-        };
+        let parsed_msg: DepositMessage = serde_json::from_str(&msg).unwrap_or_else(|_| {
+            // Return all tokens if message parsing fails
+            env::panic_str("Failed to parse deposit message");
+        });
 
         if parsed_msg.donate.unwrap_or(false) {
             self.total_assets = self
